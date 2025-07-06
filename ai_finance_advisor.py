@@ -21,9 +21,10 @@ if st.button("Get Advice"):
     # Pie chart
     st.subheader("📊 Allocation Chart")
     alloc = result["allocation"]
-    eq = int(alloc["Equity"].split("~₹")[1])
-    de = int(alloc["Debt"].split("~₹")[1])
-    go = int(alloc["Gold"].split("~₹")[1])
+    eq = extract_amount(alloc["Equity"])
+    de = extract_amount(alloc["Debt"])
+    go = extract_amount(alloc["Gold"])
+
     chart_data = pd.DataFrame({"Type": ["Equity", "Debt", "Gold"], "Amount": [eq, de, go]})
     fig = px.pie(chart_data, names='Type', values='Amount', title="Investment Split")
     st.plotly_chart(fig)
