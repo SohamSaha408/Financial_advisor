@@ -1,7 +1,6 @@
 import requests
 
 def generate_recommendation(age, income, profession, region, goal):
-    # Basic logic for goal-based allocation
     if goal == "Wealth Accumulation":
         equity_pct, debt_pct, gold_pct = 70, 20, 10
     elif goal == "Retirement Planning":
