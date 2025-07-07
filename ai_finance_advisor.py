@@ -24,7 +24,7 @@ def set_background(image_file):
         """
         st.markdown(css, unsafe_allow_html=True)
 
-set_background("15a484b1-4a82-46b4-aa9f-f8869b36b6b4.png")
+set_background("best-financial-websites-examples.png")
 
 def extract_amount(value_str):
     match = re.search(r"₹([0-9]+)", value_str)
