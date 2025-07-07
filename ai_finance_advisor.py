@@ -26,9 +26,9 @@ def set_background(image_file):
 set_background('best-financial-websites-examples.png')  # Replace with your image file name
 
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
-st.title("💸 AI Financial Advisor")
+st.title(" AI Financial Advisor")
 
-st.header("📊 Get Your Investment Plan")
+st.header(" Get Your Investment Plan")
 age = st.number_input("Age", min_value=18)
 income = st.number_input("Monthly Income (₹)", step=1000)
 profession = st.selectbox("Profession", ["Student", "Salaried", "Self-employed"])
@@ -37,7 +37,7 @@ region = st.selectbox("Region", ["Metro", "Urban", "Rural"])
 if st.button("Get Advice"):
     result = generate_recommendation(age, income, profession, region)
 
-    st.subheader("🧠 Advice")
+    st.subheader(" Advice")
     st.markdown(result["advice_text"])
 
     # Pie chart
