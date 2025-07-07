@@ -5,7 +5,7 @@ import re
 import base64
 from advisor import generate_recommendation, search_funds
 
-# Set background image
+# Set background image and add dark central block for text visibility
 def set_background(image_file):
     with open(image_file, "rb") as f:
         data = f.read()
@@ -20,6 +20,13 @@ def set_background(image_file):
             background-attachment: fixed;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }}
+        .main-block {{
+            background-color: rgba(0, 0, 0, 0.75);
+            padding: 2rem;
+            border-radius: 1rem;
+            margin: auto;
+            width: 85%;
+        }}
         </style>
         """
         st.markdown(css, unsafe_allow_html=True)
@@ -31,6 +38,8 @@ def extract_amount(value_str):
     return int(match.group(1)) if match else 0
 
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
+st.markdown("<div class='main-block'>", unsafe_allow_html=True)
+
 st.title("💸 AI Financial Advisor")
 
 st.header("📊 Get Your Investment Plan")
@@ -83,3 +92,5 @@ if user_question:
         )
         st.subheader("🤖 AI Says:")
         st.markdown(response.choices[0].message.content)
+
+st.markdown("</div>", unsafe_allow_html=True)
