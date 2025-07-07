@@ -35,6 +35,12 @@ age = st.number_input("Age", min_value=18)
 income = st.number_input("Monthly Income (₹)", step=1000)
 profession = st.selectbox("Profession", ["Student", "Salaried", "Self-employed"])
 region = st.selectbox("Region", ["Metro", "Urban", "Rural"])
+import re  # Ensure this is at the top with your imports
+
+def extract_amount(value_str):
+    match = re.search(r"₹([0-9]+)", value_str)
+    return int(match.group(1)) if match else 0
+
 
 if st.button("Get Advice"):
     result = generate_recommendation(age, income, profession, region)
