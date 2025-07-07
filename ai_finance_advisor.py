@@ -18,6 +18,8 @@ def set_background(image_file):
             background-position: center;
             background-repeat: no-repeat;
             background-attachment: fixed;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
         }}
         </style>
         """
