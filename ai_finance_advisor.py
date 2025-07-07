@@ -3,6 +3,28 @@ import pandas as pd
 import plotly.express as px
 from advisor import generate_recommendation
 
+
+import base64
+
+def set_background(image_file):
+    with open(image_file, "rb") as f:
+        data = f.read()
+        encoded = base64.b64encode(data).decode()
+        css = f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/png;base64,{encoded}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        </style>
+        """
+        st.markdown(css, unsafe_allow_html=True)
+
+set_background("background.png")  # Replace with your image file name
+
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
 st.title("💸 AI Financial Advisor")
 
