@@ -1,80 +1,55 @@
-import yfinance as yf
 import requests
 
-def get_real_mutual_funds():
-    scheme_codes = {
-        "Axis Bluechip Fund": "120503",
-        "Mirae Asset Large Cap Fund": "118834",
-        "Canara Robeco Bluechip Equity Fund": "103241"
+def generate_recommendation(age, income, profession, region, goal):
+    # Basic logic for goal-based allocation
+    if goal == "Wealth Accumulation":
+        equity_pct, debt_pct, gold_pct = 70, 20, 10
+    elif goal == "Retirement Planning":
+        equity_pct, debt_pct, gold_pct = 50, 40, 10
+    elif goal == "Short-term Savings":
+        equity_pct, debt_pct, gold_pct = 20, 70, 10
+    else:  # ELSS Tax Saving
+        equity_pct, debt_pct, gold_pct = 80, 10, 10
+
+    equity_amt = round(income * equity_pct / 100)
+    debt_amt = round(income * debt_pct / 100)
+    gold_amt = round(income * gold_pct / 100)
+
+    allocation = {
+        "Equity": f"{equity_pct}% (~₹{equity_amt})",
+        "Debt": f"{debt_pct}% (~₹{debt_amt})",
+        "Gold": f"{gold_pct}% (~₹{gold_amt})"
     }
-    funds = []
-    for name, code in scheme_codes.items():
-        url = f"https://api.mfapi.in/mf/{code}"
-        try:
-            res = requests.get(url)
-            if res.status_code == 200:
-                data = res.json()
-                nav = data["data"][0]["nav"]
-                funds.append({"name": name, "code": code, "latest_nav": f"₹{nav}"})
-        except:
-            funds.append({"name": name, "code": code, "latest_nav": "Unavailable"})
-    return funds
 
-def get_stock_suggestions():
-    symbols = ['INFY.NS', 'TCS.NS', 'RELIANCE.NS', 'SBIN.NS', 'HDFCBANK.NS']
-    stocks = []
-    for s in symbols:
-        try:
-            stock = yf.Ticker(s)
-            info = stock.info
-            stocks.append({
-                "name": info.get("shortName", s),
-                "symbol": s,
-                "price": f"₹{info.get('currentPrice', 'N/A')}",
-                "sector": info.get("sector", "N/A")
-            })
-        except:
-            stocks.append({"name": s, "symbol": s, "price": "N/A", "sector": "N/A"})
-    return stocks
+    advice_text = f"""
+    ## Investment Advice
+    Based on your profile:
 
-def generate_recommendation(age, income, profession, region):
-    if age < 30:
-        risk = "Aggressive"; eq, de, go = 60, 20, 20
-    elif 30 <= age <= 45:
-        risk = "Balanced"; eq, de, go = 50, 30, 20
-    else:
-        risk = "Conservative"; eq, de, go = 30, 50, 20
+    - Age: {age}
+    - Income: ₹{income}
+    - Profession: {profession}
+    - Region: {region}
+    - Goal: {goal}
 
-    eq_amt, de_amt, go_amt = income * eq // 100, income * de // 100, income * go // 100
-    funds = get_real_mutual_funds()
-    stocks = get_stock_suggestions()
-
-    summary = f"""
-🧾 Based on your profile ({age} yrs, {profession}, ₹{income}/mo, region: {region}):
-
-🔐 **Risk Profile**: {risk}
-
-💡 **Split**:
-- ₹{eq_amt} in equity
-- ₹{de_amt} in debt
-- ₹{go_amt} in gold
-
-📈 **Mutual Funds**:
-"""
-    for f in funds:
-        summary += f"- {f['name']} (NAV: {f['latest_nav']})\n"
-    summary += "\n💹 **Stocks**:\n"
-    for s in stocks:
-        summary += f"- {s['name']} ({s['symbol']}): {s['price']} | Sector: {s['sector']}\n"
+    **Suggested allocation:**
+    - {equity_pct}% in Equity (~₹{equity_amt})
+    - {debt_pct}% in Debt (~₹{debt_amt})
+    - {gold_pct}% in Gold (~₹{gold_amt})
+    """
 
     return {
-        "risk_profile": risk,
-        "allocation": {
-            "Equity": f"{eq}% (~₹{eq_amt})",
-            "Debt": f"{de}% (~₹{de_amt})",
-            "Gold": f"{go}% (~₹{go_amt})"
-        },
-        "suggested_mutual_funds": funds,
-        "suggested_stocks": stocks,
-        "advice_text": summary
+        "allocation": allocation,
+        "advice_text": advice_text
     }
+
+
+def search_funds(query):
+    search_results = []
+    try:
+        mf_list = requests.get("https://api.mfapi.in/mf").json()
+        for mf in mf_list:
+            if query.lower() in mf["schemeName"].lower():
+                search_results.append(mf)
+    except Exception:
+        search_results.append({"schemeName": "Unable to fetch results. Check your internet or API."})
+    return search_results
