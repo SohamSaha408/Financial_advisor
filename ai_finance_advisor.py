@@ -23,8 +23,8 @@ def set_background(image_file):
         """
         st.markdown(css, unsafe_allow_html=True)
 
-set_background("best-financial-websites-examples.png
-")  # Replace with your image file name
+set_background(best-financial-websites-examples.png
+)  # Replace with your image file name
 
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
 st.title("💸 AI Financial Advisor")
