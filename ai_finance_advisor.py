@@ -4,8 +4,10 @@ import plotly.express as px
 import re
 import base64
 import os
-import google.generativeai as genai # Import the Google Generative AI library
+import google.generativeai as genai
+from pypdf import PdfReader # Import PdfReader for PDF processing
 
+# Assuming 'advisor.py' is in the same directory and contains these functions
 from advisor import generate_recommendation, search_funds
 
 # IMPORTANT: st.set_page_config MUST be the first Streamlit command
@@ -146,7 +148,7 @@ def set_background(image_file):
         st.markdown(fallback_css, unsafe_allow_html=True)
 
 
-# Set your background image
+# Set your background image (ensure 'black-particles-background.avif' is in your project directory)
 set_background("black-particles-background.avif")
 
 # --- 2. Main App Logic ---
@@ -155,6 +157,17 @@ set_background("black-particles-background.avif")
 def extract_amount(value_str):
     match = re.search(r"₹([0-9]+)", value_str)
     return int(match.group(1)) if match else 0
+
+# Function to extract text from PDF
+def get_pdf_text(pdf_file):
+    text = ""
+    try:
+        pdf_reader = PdfReader(pdf_file)
+        for page in pdf_reader.pages:
+            text += page.extract_text()
+    except Exception as e:
+        st.error(f"Error reading PDF: {e}")
+    return text
 
 # --- Streamlit App Layout ---
 
@@ -205,6 +218,69 @@ if search_query:
         st.markdown(f"<p style='color: white;'>Scheme Code: {fund.get('schemeCode', 'N/A')}</p>", unsafe_allow_html=True)
         st.markdown(f"<p style='color: white;'>[Live NAV](https://api.mfapi.in/mf/{fund.get('schemeCode', '')})</p>", unsafe_allow_html=True)
 
+# --- New: Document Analyzer Section ---
+st.markdown("---")
+st.header("📄 Document Analyzer")
+st.write("Upload a document (PDF or TXT) for the AI to analyze and provide advice.")
+uploaded_file = st.file_uploader("Choose a file", type=["pdf", "txt"], key="doc_uploader")
+
+document_text = ""
+if uploaded_file is not None:
+    # Get file extension for specific handling
+    file_extension = os.path.splitext(uploaded_file.name)[1].lower()
+
+    if file_extension == ".pdf":
+        st.info("Extracting text from PDF... This may take a moment for large files.")
+        document_text = get_pdf_text(uploaded_file)
+    elif file_extension == ".txt":
+        st.info("Reading text from TXT file...")
+        document_text = uploaded_file.getvalue().decode("utf-8")
+    else:
+        st.warning("Unsupported file type. Please upload a PDF or TXT file.")
+
+    if document_text:
+        st.subheader("Extracted Document Text (Preview)")
+        # Show only first 1000 characters for preview, indicate if truncated
+        preview_text = document_text[:1000]
+        if len(document_text) > 1000:
+            preview_text += "\n\n... (Document truncated for preview. Full content sent to AI.)"
+        st.text_area("Document Content", preview_text, height=300, disabled=True)
+
+        st.markdown("---")
+        st.subheader("Ask AI about this Document")
+        document_question = st.text_area("What do you want to know or analyze about this document?", key="doc_ai_question_area")
+
+        if st.button("Analyze Document", key="analyze_doc_btn"):
+            if document_question:
+                try:
+                    genai.configure(api_key=st.secrets["gemini"]["api_key"])
+                except KeyError:
+                    st.error("Gemini API key not found in Streamlit secrets. Please ensure .streamlit/secrets.toml is correctly configured.")
+                    st.stop()
+
+                # Using 'gemini-1.5-flash' as it's generally good for larger context windows
+                # Make sure this model is available to your API key
+                model = genai.GenerativeModel('gemini-1.5-flash')
+
+                with st.spinner("Analyzing document..."):
+                    try:
+                        # Construct a detailed prompt for document analysis
+                        prompt = (
+                            f"You are a helpful and expert Indian financial advisor. Analyze the following document and provide advice/answers based on the user's question.\n\n"
+                            f"--- Document Content ---\n{document_text}\n\n"
+                            f"--- User Question ---\n{document_question}\n\n"
+                            f"--- Financial Advice/Analysis ---"
+                        )
+                        response = model.generate_content(contents=[{"role": "user", "parts": [prompt]}])
+                        st.subheader("🤖 AI's Document Analysis:")
+                        st.markdown(f"<p style='color: white;'>{response.text}</p>", unsafe_allow_html=True)
+                    except Exception as e:
+                        st.error(f"Error calling Gemini AI for document analysis: {e}. This might be due to model token limits or other API issues. Try a shorter document or question.")
+            else:
+                st.warning("Please enter a question to analyze the document.")
+    else:
+        st.warning("Could not extract text from the uploaded document. Please try another file or ensure it's a readable PDF/TXT.")
+
 st.markdown("---")
 st.header("💬 Ask the AI")
 user_question = st.text_area("Ask your financial question:", key="ai_question_area")
@@ -213,13 +289,12 @@ if user_question:
     # --- Configure Gemini AI ---
     try:
         genai.configure(api_key=st.secrets["gemini"]["api_key"])
-    except AttributeError:
+    except AttributeError: # Changed from KeyError as per your original code, but KeyError is more specific for st.secrets
         st.error("Gemini API key not found in Streamlit secrets. Please set it as `gemini.api_key` in .streamlit/secrets.toml")
         st.stop() # Stop execution if API key is not found
 
     # Initialize the Generative Model (you can choose 'gemini-pro', 'gemini-1.5-flash', etc.)
-    # 'gemini-pro' is a good general-purpose model.
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash') # Retained the model you were using
 
     with st.spinner("Thinking..."):
         try:
