@@ -5,10 +5,7 @@ import re
 import base64
 from advisor import generate_recommendation, search_funds
 
-# Ensure page config is set first
-st.set_page_config(page_title="AI Financial Advisor", layout="centered")
-
-# --- 1. Background and Global CSS for the Custom Box ---
+# --- 1. Background and Initial CSS (Revised to target Streamlit's main content) ---
 def set_background(image_file):
     with open(image_file, "rb") as f:
         data = f.read()
@@ -23,28 +20,30 @@ def set_background(image_file):
             background-repeat: no-repeat;
             background-attachment: fixed;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            /* Ensure .stApp is positioned to allow z-index for children if needed */
-            position: relative;
-            z-index: 0; /* Background layer */
         }}
 
-        /* Styles for the custom black box (this is the key part) */
-        .custom-black-box {{
+        /* Target Streamlit's main content block (the area that holds your elements) */
+        /* Streamlit wraps content in divs. We want to target the one that's the direct parent
+           of your Streamlit elements, which often has specific class names like
+           .stApp > header, .main .block-container, or a specific generated class.
+           A common structure is `div.stApp > div > div.main > div.block-container`
+        */
+        .main .block-container {{
             background-color: rgba(0, 0, 0, 0.75); /* Black with 75% opacity */
-            padding: 2rem; /* Space inside the box */
+            padding: 2rem; /* Padding inside the box */
             border-radius: 1rem; /* Rounded corners */
-            margin: 2rem auto; /* Top/bottom margin 2rem, auto for left/right to center */
-            max-width: 700px; /* Constrain width on larger screens */
+            margin: 2rem auto; /* Top/bottom margin, auto for left/right to center */
+            max-width: 700px; /* Set a max width for better readability on large screens */
             width: 90%; /* Responsive width */
-            color: white; /* Default text color inside the box */
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); /* Subtle shadow */
+            color: white; /* Ensure text inside is white for contrast */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); /* A subtle shadow for depth */
             backdrop-filter: blur(5px); /* Optional: Adds a slight blur to content behind it */
             -webkit-backdrop-filter: blur(5px); /* For Safari support */
-            z-index: 1; /* Ensure this box is above the background */
-            position: relative; /* Needed for z-index to work correctly if using absolute positioning later */
+            overflow: auto; /* In case content overflows */
         }}
 
-        /* Adjust Streamlit's default elements for better contrast *within* the black box */
+        /* Adjust Streamlit's default elements for better contrast */
+        /* These ensure text within the black box is readable */
         .stMarkdown, .stText, .stLabel, .stTextInput > div > label, .stNumberInput > label, .stSelectbox > label, .stTextArea > label {{
             color: white !important; /* Force white text for labels */
         }}
@@ -90,33 +89,33 @@ def set_background(image_file):
             background-color: rgba(0, 0, 0, 0.9); /* Dark background for dropdown options */
             color: white; /* White text for dropdown options */
         }}
-
         </style>
         """
         st.markdown(css, unsafe_allow_html=True)
 
-# Set the background image
-# IMPORTANT: Make sure 'best-financial-websites-examples.png' is in the same directory as this Python script
+# Set your background image
 set_background("best-financial-websites-examples.png")
 
 # --- 2. Main App Logic ---
+st.set_page_config(page_title="AI Financial Advisor", layout="centered")
 
-# Helper function for extracting amount
+# --- Helper function for extracting amount ---
 def extract_amount(value_str):
     match = re.search(r"₹([0-9]+)", value_str)
     return int(match.group(1)) if match else 0
 
 # --- Streamlit App Layout ---
 
-# These titles appear *above* the black box, directly on the background
+# These titles should be *outside* the black box if you want them on the full background
 st.title("💸 AI Financial Advisor")
 st.header("📊 Get Your Investment Plan")
 
-# Now, create a custom div with the black box styling
-# This div will wrap ONLY the input form, buttons, and results
-st.markdown("<div class='custom-black-box'>", unsafe_allow_html=True)
 
-# --- Input Section (These elements will be inside the black box) ---
+# The content below will automatically be within the `.main .block-container`
+# which we are now styling as the black box.
+# You no longer need `st.markdown("<div class='main-block'>")` wrappers.
+
+# --- Input Section ---
 age = st.number_input("Age", min_value=18, key="age_input")
 income = st.number_input("Monthly Income (₹)", step=1000, key="income_input")
 profession = st.selectbox("Profession", ["Student", "Salaried", "Self-employed"], key="prof_select")
@@ -128,7 +127,8 @@ goal = st.selectbox("🎯 Investment Goal", [
 if st.button("Get Advice", key="get_advice_btn"):
     result = generate_recommendation(age, income, profession, region, goal)
     st.subheader("🧠 Advice")
-    # Ensure Markdown content gets the correct text color
+    # Ensure Markdown is rendered with appropriate styling for text color
+    # Streamlit's subheader will get the E0E0E0 color, but raw markdown needs explicit color
     st.markdown(f"<p style='color: white;'>{result['advice_text']}</p>", unsafe_allow_html=True)
 
     st.subheader("📊 Allocation Chart")
@@ -161,7 +161,6 @@ user_question = st.text_area("Ask your financial question:", key="ai_question_ar
 
 if user_question:
     import openai
-    # Make sure st.secrets is configured with your OpenAI API key
     openai.api_key = st.secrets["openai"]["api_key"]
     with st.spinner("Thinking..."):
         response = openai.ChatCompletion.create(
@@ -174,5 +173,5 @@ if user_question:
         st.subheader("🤖 AI Says:")
         st.markdown(f"<p style='color: white;'>{response.choices[0].message.content}</p>", unsafe_allow_html=True)
 
-# Close the custom black box div
-st.markdown("</div>", unsafe_allow_html=True)
+# Removed the closing </div> because we're no longer using a custom div wrapper
+# and are instead styling Streamlit's default container.
