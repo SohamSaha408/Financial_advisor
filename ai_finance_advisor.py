@@ -3,12 +3,89 @@ import pandas as pd
 import plotly.express as px
 import re
 import base64
+import os # Import os for checking file existence
+
+# Import the Google Generative AI library
+import google.generativeai as genai
+
 from advisor import generate_recommendation, search_funds
 
 # --- 1. Background and Initial CSS (Revised to target Streamlit's main content) ---
 def set_background(image_file):
-    with open(image_file, "rb") as f:
-        data = f.read()
+    # Add error handling for background image loading
+    if not os.path.exists(image_file):
+        st.error(f"Background image not found: '{image_file}'. Please ensure the image is in the correct directory.")
+        # Fallback CSS for a default dark background if image is not found
+        css = """
+        <style>
+        .stApp {
+            background-color: #222222; /* Dark fallback color */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        /* Rest of your existing CSS for .main .block-container and Streamlit elements */
+        .main .block-container {
+            background-color: rgba(0, 0, 0, 0.75);
+            padding: 2rem;
+            border-radius: 1rem;
+            margin: 2rem auto;
+            max-width: 700px;
+            width: 90%;
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            overflow: auto;
+        }
+        .stMarkdown, .stText, .stLabel, .stTextInput > div > label, .stNumberInput > label, .stSelectbox > label, .stTextArea > label {
+            color: white !important;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #E0E0E0 !important;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
+        }
+        .stButton>button {
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 0.5rem;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .stButton>button:hover {
+            background-color: #45a049;
+        }
+        .stTextInput, .stNumberInput, .stSelectbox, .stTextArea {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .stTextInput > div > div > input,
+        .stNumberInput > div > div > input,
+        .stTextArea > div > div > textarea {
+            color: white;
+            background-color: transparent;
+            border: none;
+        }
+        .stSelectbox > div > div[data-baseweb="select"] > div[role="button"] {
+            color: white;
+            background-color: transparent;
+            border: none;
+        }
+        .stSelectbox div[data-baseweb="select"] div[role="listbox"] {
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+        }
+        </style>
+        """
+        st.markdown(css, unsafe_allow_html=True)
+        return # Exit the function if image not found
+
+    try:
+        with open(image_file, "rb") as f:
+            data = f.read()
         encoded = base64.b64encode(data).decode()
         css = f"""
         <style>
@@ -23,11 +100,6 @@ def set_background(image_file):
         }}
 
         /* Target Streamlit's main content block (the area that holds your elements) */
-        /* Streamlit wraps content in divs. We want to target the one that's the direct parent
-           of your Streamlit elements, which often has specific class names like
-           .stApp > header, .main .block-container, or a specific generated class.
-           A common structure is `div.stApp > div > div.main > div.block-container`
-        */
         .main .block-container {{
             background-color: rgba(0, 0, 0, 0.75); /* Black with 75% opacity */
             padding: 2rem; /* Padding inside the box */
@@ -43,16 +115,15 @@ def set_background(image_file):
         }}
 
         /* Adjust Streamlit's default elements for better contrast */
-        /* These ensure text within the black box is readable */
         .stMarkdown, .stText, .stLabel, .stTextInput > div > label, .stNumberInput > label, .stSelectbox > label, .stTextArea > label {{
-            color: white !important; /* Force white text for labels */
+            color: white !important;
         }}
         h1, h2, h3, h4, h5, h6 {{
-            color: #E0E0E0 !important; /* Lighter shade for headers */
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.7); /* Add slight shadow to headers */
+            color: #E0E0E0 !important;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
         }}
         .stButton>button {{
-            background-color: #4CAF50; /* A pleasant green for the button */
+            background-color: #4CAF50;
             color: white;
             border-radius: 0.5rem;
             border: none;
@@ -65,39 +136,107 @@ def set_background(image_file):
             background-color: #45a049;
         }}
         .stTextInput, .stNumberInput, .stSelectbox, .stTextArea {{
-            background-color: rgba(255, 255, 255, 0.1); /* Slightly transparent white for inputs */
+            background-color: rgba(255, 255, 255, 0.1);
             border-radius: 0.5rem;
             padding: 0.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.3); /* Light border */
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }}
-        /* Target the actual input fields themselves */
         .stTextInput > div > div > input,
         .stNumberInput > div > div > input,
         .stTextArea > div > div > textarea {{
-            color: white; /* Text color inside inputs */
-            background-color: transparent; /* Ensure input background is transparent */
-            border: none; /* Remove default input border */
+            color: white;
+            background-color: transparent;
+            border: none;
         }}
-        /* Specific styling for the selectbox display area */
         .stSelectbox > div > div[data-baseweb="select"] > div[role="button"] {{
-            color: white; /* Text color for selectbox displayed value */
-            background-color: transparent; /* Ensure selectbox background is transparent */
-            border: none; /* Remove default selectbox border */
+            color: white;
+            background-color: transparent;
+            border: none;
         }}
-        /* Specific styling for the options dropdown in selectbox */
         .stSelectbox div[data-baseweb="select"] div[role="listbox"] {{
-            background-color: rgba(0, 0, 0, 0.9); /* Dark background for dropdown options */
-            color: white; /* White text for dropdown options */
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
         }}
         </style>
         """
         st.markdown(css, unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"An unexpected error occurred while setting background: {e}")
+        # Fallback CSS for a default dark background if loading fails
+        css = """
+        <style>
+        .stApp {
+            background-color: #222222; /* Dark fallback color */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        /* Rest of your existing CSS for .main .block-container and Streamlit elements */
+        .main .block-container {
+            background-color: rgba(0, 0, 0, 0.75);
+            padding: 2rem;
+            border-radius: 1rem;
+            margin: 2rem auto;
+            max-width: 700px;
+            width: 90%;
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            overflow: auto;
+        }
+        .stMarkdown, .stText, .stLabel, .stTextInput > div > label, .stNumberInput > label, .stSelectbox > label, .stTextArea > label {
+            color: white !important;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #E0E0E0 !important;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
+        }
+        .stButton>button {
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 0.5rem;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .stButton>button:hover {
+            background-color: #45a049;
+        }
+        .stTextInput, .stNumberInput, .stSelectbox, .stTextArea {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .stTextInput > div > div > input,
+        .stNumberInput > div > div > input,
+        .stTextArea > div > div > textarea {
+            color: white;
+            background-color: transparent;
+            border: none;
+        }
+        .stSelectbox > div > div[data-baseweb="select"] > div[role="button"] {
+            color: white;
+            background-color: transparent;
+            border: none;
+        }
+        .stSelectbox div[data-baseweb="select"] div[role="listbox"] {
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+        }
+        </style>
+        """
+        st.markdown(css, unsafe_allow_html=True)
+
 
 # Set your background image
+# IMPORTANT: Make sure 'best-financial-websites-examples.png' is in the same directory as this Python script
 set_background("best-financial-websites-examples.png")
 
 # --- 2. Main App Logic ---
-st.set_page_config(page_title="AI Financial Advisor", layout="centered")
+# st.set_page_config is ideally at the very top of the script, before any Streamlit commands.
+# It's okay here for now, but best practice is to move it up.
 
 # --- Helper function for extracting amount ---
 def extract_amount(value_str):
@@ -128,7 +267,6 @@ if st.button("Get Advice", key="get_advice_btn"):
     result = generate_recommendation(age, income, profession, region, goal)
     st.subheader("🧠 Advice")
     # Ensure Markdown is rendered with appropriate styling for text color
-    # Streamlit's subheader will get the E0E0E0 color, but raw markdown needs explicit color
     st.markdown(f"<p style='color: white;'>{result['advice_text']}</p>", unsafe_allow_html=True)
 
     st.subheader("📊 Allocation Chart")
@@ -160,18 +298,38 @@ st.header("💬 Ask the AI")
 user_question = st.text_area("Ask your financial question:", key="ai_question_area")
 
 if user_question:
-    import openai
-    openai.api_key = st.secrets["openai"]["api_key"]
+    # --- Configure Gemini AI (REPLACED OPENAI) ---
+    # Ensure you have your Gemini API key configured in Streamlit secrets or environment variables
+    try:
+        # st.secrets is the recommended way to handle API keys in Streamlit
+        # Make sure you have a .streamlit/secrets.toml file with [gemini] api_key = "YOUR_KEY"
+        genai.configure(api_key=st.secrets["gemini"]["api_key"])
+    except AttributeError:
+        st.error("Gemini API key not found in Streamlit secrets. Please set it as `gemini.api_key`.")
+        st.stop() # Stop execution if API key is not found
+    except Exception as e:
+        st.error(f"Error configuring Gemini API: {e}")
+        st.stop()
+
+
+    # Initialize the Generative Model (you can choose 'gemini-pro', 'gemini-1.5-flash', etc.)
+    # 'gemini-pro' is a good general-purpose model.
+    model = genai.GenerativeModel('gemini-pro')
+
     with st.spinner("Thinking..."):
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a helpful and expert Indian financial advisor."},
-                {"role": "user", "content": user_question}
-            ]
-        )
-        st.subheader("🤖 AI Says:")
-        st.markdown(f"<p style='color: white;'>{response.choices[0].message.content}</p>", unsafe_allow_html=True)
+        try:
+            # Send the user's question to the Gemini model
+            # Gemini's generate_content takes a list of messages.
+            response = model.generate_content(
+                contents=[
+                    {"role": "user", "parts": ["You are a helpful and expert Indian financial advisor.", user_question]}
+                ]
+            )
+            st.subheader("🤖 AI Says:")
+            # Access the text from the response object
+            st.markdown(f"<p style='color: white;'>{response.text}</p>", unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Error calling Gemini AI: {e}. Please check your API key and model usage.")
 
 # Removed the closing </div> because we're no longer using a custom div wrapper
-# and are instead styling Streamlit's default container.
+# and are instead styling Streamlit's default container, as per your provided code.
