@@ -219,7 +219,7 @@ if user_question:
 
     # Initialize the Generative Model (you can choose 'gemini-pro', 'gemini-1.5-flash', etc.)
     # 'gemini-pro' is a good general-purpose model.
-    model = genai.GenerativeModel('gemini-pro-vision')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
     with st.spinner("Thinking..."):
         try:
