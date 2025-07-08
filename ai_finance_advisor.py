@@ -4,7 +4,7 @@ import plotly.express as px
 import re
 import base64
 import os
-import google.generativeai as genai
+import google.generativeai as genai # Import the Google Generative AI library
 
 from advisor import generate_recommendation, search_funds
 
@@ -12,7 +12,6 @@ from advisor import generate_recommendation, search_funds
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
 
 # --- 1. Background and Initial CSS (Revised to target Streamlit's main content) ---
-# (Your set_background function goes here, unchanged from the previous version)
 def set_background(image_file):
     # Check if the image file exists to prevent FileNotFoundError
     if not os.path.exists(image_file):
@@ -146,6 +145,8 @@ def set_background(image_file):
         """
         st.markdown(fallback_css, unsafe_allow_html=True)
 
+
+# Set your background image
 set_background("best-financial-websites-examples.png")
 
 # --- 2. Main App Logic ---
@@ -157,32 +158,9 @@ def extract_amount(value_str):
 
 # --- Streamlit App Layout ---
 
+# These titles should be *outside* the black box if you want them on the full background
 st.title("💸 AI Financial Advisor")
 st.header("📊 Get Your Investment Plan")
-
-
-# --- TEMPORARY DEBUGGING SECTION FOR GEMINI MODELS ---
-st.markdown("---")
-st.subheader("🛠️ Gemini Model Debug Info 🛠️")
-try:
-    genai.configure(api_key=st.secrets["gemini"]["api_key"])
-    st.write("Gemini API key configured successfully.")
-
-    st.write("Fetching available Gemini models...")
-    available_models = [m.name for m in genai.list_models() if "generateContent" in m.supported_generation_methods]
-
-    if available_models:
-        st.write("Models supporting 'generateContent':")
-        for model_name in available_models:
-            st.write(f"- `{model_name}`")
-        st.info("Please pick one of the models listed above (e.g., `gemini-1.5-flash` or `gemini-1.5-pro`) and replace `'gemini-pro'` in the 'Ask the AI' section.")
-    else:
-        st.warning("No models supporting 'generateContent' found with your API key. This could indicate an issue with your API key permissions or regional availability.")
-
-except Exception as e:
-    st.error(f"Error fetching Gemini models: {e}. Ensure your API key is correct in .streamlit/secrets.toml and has necessary permissions.")
-st.markdown("---")
-# --- END TEMPORARY DEBUGGING SECTION ---
 
 
 # The content below will automatically be within the `.main .block-container`
@@ -200,6 +178,7 @@ goal = st.selectbox("🎯 Investment Goal", [
 if st.button("Get Advice", key="get_advice_btn"):
     result = generate_recommendation(age, income, profession, region, goal)
     st.subheader("🧠 Advice")
+    # Ensure Markdown is rendered with appropriate styling for text color
     st.markdown(f"<p style='color: white;'>{result['advice_text']}</p>", unsafe_allow_html=True)
 
     st.subheader("📊 Allocation Chart")
@@ -209,12 +188,14 @@ if st.button("Get Advice", key="get_advice_btn"):
     go = extract_amount(alloc["Gold"])
     chart_data = pd.DataFrame({"Type": ["Equity", "Debt", "Gold"], "Amount": [eq, de, go]})
     fig = px.pie(chart_data, names='Type', values='Amount', title="Investment Split")
+    # Set chart background to transparent so the black box shows through
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
     fig.update_traces(textinfo='percent+label', marker=dict(line=dict(color='#000000', width=1)))
     fig.update_layout(title_font_color='white', legend_font_color='white')
     st.plotly_chart(fig, use_container_width=True)
 
-st.markdown("---")
+
+st.markdown("---") # This divider will also be inside the black box
 st.header("🔍 Mutual Fund Research")
 search_query = st.text_input("Enter fund name to search", key="fund_search_input")
 if search_query:
@@ -229,23 +210,27 @@ st.header("💬 Ask the AI")
 user_question = st.text_area("Ask your financial question:", key="ai_question_area")
 
 if user_question:
+    # --- Configure Gemini AI ---
     try:
         genai.configure(api_key=st.secrets["gemini"]["api_key"])
-    except KeyError:
-        st.error("Gemini API key not found in Streamlit secrets. Please ensure .streamlit/secrets.toml is correctly configured.")
-        st.stop()
+    except AttributeError:
+        st.error("Gemini API key not found in Streamlit secrets. Please set it as `gemini.api_key` in .streamlit/secrets.toml")
+        st.stop() # Stop execution if API key is not found
 
-    # THIS IS THE LINE YOU WILL LIKELY CHANGE AFTER DEBUGGING
+    # Initialize the Generative Model (you can choose 'gemini-pro', 'gemini-1.5-flash', etc.)
+    # 'gemini-pro' is a good general-purpose model.
     model = genai.GenerativeModel('gemini-pro')
 
     with st.spinner("Thinking..."):
         try:
+            # Send the user's question to the Gemini model
             response = model.generate_content(
                 contents=[
                     {"role": "user", "parts": ["You are a helpful and expert Indian financial advisor.", user_question]}
                 ]
             )
             st.subheader("🤖 AI Says:")
+            # Access the text from the response object
             st.markdown(f"<p style='color: white;'>{response.text}</p>", unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Error calling Gemini AI: {e}. Please check your API key and model usage.")
