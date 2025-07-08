@@ -3,15 +3,16 @@ import pandas as pd
 import plotly.express as px
 import re
 import base64
-from advisor import generate_recommendation, search_funds # Assuming advisor.py is in the same directory
+from advisor import generate_recommendation, search_funds
 
-# --- 1. Background and Initial CSS ---
+# --- 1. Background and Initial CSS (Revised to target Streamlit's main content) ---
 def set_background(image_file):
     with open(image_file, "rb") as f:
         data = f.read()
         encoded = base64.b64encode(data).decode()
         css = f"""
         <style>
+        /* Styles for the overall app background */
         .stApp {{
             background-image: url("data:image/png;base64,{encoded}");
             background-size: cover;
@@ -21,8 +22,13 @@ def set_background(image_file):
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }}
 
-        /* This is the key CSS for your black box */
-        .main-block {{
+        /* Target Streamlit's main content block (the area that holds your elements) */
+        /* Streamlit wraps content in divs. We want to target the one that's the direct parent
+           of your Streamlit elements, which often has specific class names like
+           .stApp > header, .main .block-container, or a specific generated class.
+           A common structure is `div.stApp > div > div.main > div.block-container`
+        */
+        .main .block-container {{
             background-color: rgba(0, 0, 0, 0.75); /* Black with 75% opacity */
             padding: 2rem; /* Padding inside the box */
             border-radius: 1rem; /* Rounded corners */
@@ -33,9 +39,11 @@ def set_background(image_file):
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); /* A subtle shadow for depth */
             backdrop-filter: blur(5px); /* Optional: Adds a slight blur to content behind it */
             -webkit-backdrop-filter: blur(5px); /* For Safari support */
+            overflow: auto; /* In case content overflows */
         }}
 
         /* Adjust Streamlit's default elements for better contrast */
+        /* These ensure text within the black box is readable */
         .stMarkdown, .stText, .stLabel, .stTextInput > div > label, .stNumberInput > label, .stSelectbox > label, .stTextArea > label {{
             color: white !important; /* Force white text for labels */
         }}
@@ -62,48 +70,50 @@ def set_background(image_file):
             padding: 0.5rem;
             border: 1px solid rgba(255, 255, 255, 0.3); /* Light border */
         }}
-        .stTextInput > div > div > input, .stNumberInput > div > div > input, .stTextArea > div > div > textarea {{
+        /* Target the actual input fields themselves */
+        .stTextInput > div > div > input,
+        .stNumberInput > div > div > input,
+        .stTextArea > div > div > textarea {{
             color: white; /* Text color inside inputs */
             background-color: transparent; /* Ensure input background is transparent */
             border: none; /* Remove default input border */
         }}
-        .stSelectbox > div > div {{
-            color: white; /* Text color for selectbox */
+        /* Specific styling for the selectbox display area */
+        .stSelectbox > div > div[data-baseweb="select"] > div[role="button"] {{
+            color: white; /* Text color for selectbox displayed value */
             background-color: transparent; /* Ensure selectbox background is transparent */
             border: none; /* Remove default selectbox border */
         }}
         /* Specific styling for the options dropdown in selectbox */
         .stSelectbox div[data-baseweb="select"] div[role="listbox"] {{
-            background-color: rgba(0, 0, 0, 0.8); /* Dark background for dropdown */
+            background-color: rgba(0, 0, 0, 0.9); /* Dark background for dropdown options */
             color: white; /* White text for dropdown options */
         }}
-
         </style>
         """
         st.markdown(css, unsafe_allow_html=True)
 
 # Set your background image
-# IMPORTANT: Make sure 'best-financial-websites-examples.png' is in the same directory as this Python script
 set_background("best-financial-websites-examples.png")
 
 # --- 2. Main App Logic ---
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
 
-# These titles appear *above* the black box, as seen in your image
-st.title("💸 AI Financial Advisor")
-st.header("📊 Get Your Investment Plan")
-
-# Now, create a Streamlit container for the form elements and results
-# This container will receive the black box styling from the CSS injected above.
-# We're wrapping this in a `with` statement for convenience.
-
-# Using the explicit `st.markdown` div to wrap the main content
-st.markdown("<div class='main-block'>", unsafe_allow_html=True)
-
 # --- Helper function for extracting amount ---
 def extract_amount(value_str):
     match = re.search(r"₹([0-9]+)", value_str)
     return int(match.group(1)) if match else 0
+
+# --- Streamlit App Layout ---
+
+# These titles should be *outside* the black box if you want them on the full background
+st.title("💸 AI Financial Advisor")
+st.header("📊 Get Your Investment Plan")
+
+
+# The content below will automatically be within the `.main .block-container`
+# which we are now styling as the black box.
+# You no longer need `st.markdown("<div class='main-block'>")` wrappers.
 
 # --- Input Section ---
 age = st.number_input("Age", min_value=18, key="age_input")
@@ -118,6 +128,7 @@ if st.button("Get Advice", key="get_advice_btn"):
     result = generate_recommendation(age, income, profession, region, goal)
     st.subheader("🧠 Advice")
     # Ensure Markdown is rendered with appropriate styling for text color
+    # Streamlit's subheader will get the E0E0E0 color, but raw markdown needs explicit color
     st.markdown(f"<p style='color: white;'>{result['advice_text']}</p>", unsafe_allow_html=True)
 
     st.subheader("📊 Allocation Chart")
@@ -150,9 +161,6 @@ user_question = st.text_area("Ask your financial question:", key="ai_question_ar
 
 if user_question:
     import openai
-    # Ensure you have your OpenAI API key configured in Streamlit secrets or environment variables
-    # For local testing, you might temporarily hardcode it, but for deployment, use st.secrets
-    # openai.api_key = "YOUR_OPENAI_API_KEY" # <--- ONLY FOR LOCAL TESTING, REMOVE FOR DEPLOYMENT
     openai.api_key = st.secrets["openai"]["api_key"]
     with st.spinner("Thinking..."):
         response = openai.ChatCompletion.create(
@@ -165,5 +173,5 @@ if user_question:
         st.subheader("🤖 AI Says:")
         st.markdown(f"<p style='color: white;'>{response.choices[0].message.content}</p>", unsafe_allow_html=True)
 
-# Close the main-block div
-st.markdown("</div>", unsafe_allow_html=True)
+# Removed the closing </div> because we're no longer using a custom div wrapper
+# and are instead styling Streamlit's default container.
