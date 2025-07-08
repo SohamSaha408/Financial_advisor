@@ -45,7 +45,6 @@ def set_background(image_file):
         }}
 
         /* Adjust Streamlit's default elements for better contrast *within* the black box */
-        /* These ensure text within the black box is readable */
         .stMarkdown, .stText, .stLabel, .stTextInput > div > label, .stNumberInput > label, .stSelectbox > label, .stTextArea > label {{
             color: white !important; /* Force white text for labels */
         }}
