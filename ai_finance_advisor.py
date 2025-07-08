@@ -147,7 +147,7 @@ def set_background(image_file):
 
 
 # Set your background image
-set_background("best-financial-websites-examples.png")
+set_background("black-particles-background.avif")
 
 # --- 2. Main App Logic ---
 
