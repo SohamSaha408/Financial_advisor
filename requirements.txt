@@ -7,7 +7,7 @@ yfinance
 requests
 plotly
 pandas
-
+datetime
 pypdf
 fredapi
 tabulate
