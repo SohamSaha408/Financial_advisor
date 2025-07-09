@@ -232,6 +232,46 @@ def get_company_financials(symbol, statement_type="INCOME_STATEMENT"):
 
 st.title("💸 AI Financial Advisor")
 
+# --- Dashboard Tiles ---
+st.markdown("### 📂 Dashboard")
+st.markdown("""
+<style>
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+.dashboard-tile {
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid #4CAF50;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    text-align: center;
+    cursor: pointer;
+    color: white;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+.dashboard-tile:hover {
+    background-color: rgba(76, 175, 80, 0.3);
+}
+</style>
+
+<div class="dashboard-grid">
+  <div class="dashboard-tile" onclick="scrollToElement('investment_plan')">📊 Investment Plan</div>
+  <div class="dashboard-tile" onclick="scrollToElement('mutual_fund_research')">🔍 Mutual Funds</div>
+  <div class="dashboard-tile" onclick="scrollToElement('document_analyzer')">📄 Document Analyzer</div>
+  <div class="dashboard-tile" onclick="scrollToElement('fred_data')">📈 FRED Data</div>
+  <div class="dashboard-tile" onclick="scrollToElement('market_trends_data')">📊 Market Trends</div>
+  <div class="dashboard-tile" onclick="scrollToElement('financial_news')">📰 Financial News</div>
+  <div class="dashboard-tile" onclick="scrollToElement('company_financials')">🏢 Company Financials</div>
+  <div class="dashboard-tile" onclick="scrollToElement('ai_summary')">🧠 AI Summary</div>
+  <div class="dashboard-tile" onclick="scrollToElement('ask_the_ai')">💬 Ask the AI</div>
+</div>
+""", unsafe_allow_html=True)
+
+
 
 # --- Investment Plan Section ---
 st.markdown("<div id='investment_plan'></div>", unsafe_allow_html=True) # Anchor for scrolling
