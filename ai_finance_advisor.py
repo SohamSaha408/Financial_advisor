@@ -9,6 +9,7 @@ import requests
 import google.generativeai as genai
 from pypdf import PdfReader
 from fredapi import Fred
+import yfinance as yf # NEW IMPORT
 
 from advisor import generate_recommendation, search_funds
 
@@ -358,6 +359,89 @@ if st.button("Get FRED Data", key="fetch_fred_data_btn"):
         st.warning("Please enter a FRED Series ID to fetch data.")
 
 
+# --- NEW: Market Trends Visualization Section ---
+st.markdown("---")
+st.header("📈 Market Trends Visualization (Candlestick)")
+st.write("Visualize historical price trends for Nifty 50 or other stock/index symbols.")
+st.info("Hint: For Nifty 50, use ticker `^NSEI`. For Reliance Industries, use `RELIANCE.NS`.")
+
+market_ticker = st.text_input(
+    "Enter Stock/Index Ticker Symbol (e.g., ^NSEI, RELIANCE.NS):",
+    value="^NSEI", # Default to Nifty 50
+    key="market_ticker_input"
+).strip().upper()
+
+# Set default start date to 1 year ago and end date to today
+from datetime import datetime, timedelta
+end_date = datetime.now().date()
+start_date = end_date - timedelta(days=365) # One year ago
+
+col1, col2 = st.columns(2)
+with col1:
+    chart_start_date = st.date_input("Start Date", value=start_date, key="chart_start_date")
+with col2:
+    chart_end_date = st.date_input("End Date", value=end_date, key="chart_end_date")
+
+if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
+    if market_ticker:
+        with st.spinner(f"Fetching historical data for {market_ticker}..."):
+            try:
+                # Fetch data using yfinance
+                data = yf.download(market_ticker, start=chart_start_date, end=chart_end_date)
+
+                if not data.empty:
+                    st.subheader(f"Candlestick Chart for {market_ticker}")
+                    fig = go.Figure(data=[go.Candlestick(
+                        x=data.index,
+                        open=data['Open'],
+                        high=data['High'],
+                        low=data['Low'],
+                        close=data['Close']
+                    )])
+                    fig.update_layout(
+                        title=f"{market_ticker} Price Trend ({chart_start_date} to {chart_end_date})",
+                        xaxis_title="Date",
+                        yaxis_title="Price",
+                        xaxis_rangeslider_visible=False, # Hide the range slider for cleaner look
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        font_color='white',
+                        xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.2)'),
+                        yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.2)')
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # --- Capture for AI Summary ---
+                    st.session_state['ai_summary_data']['Market Trend Visualization'] = {
+                        "ticker": market_ticker,
+                        "date_range": f"{chart_start_date} to {chart_end_date}",
+                        "data_summary": f"Fetched {len(data)} data points. "
+                                        f"Open: {data['Open'].iloc[0]:.2f}, "
+                                        f"Close: {data['Close'].iloc[-1]:.2f}, "
+                                        f"High: {data['High'].max():.2f}, "
+                                        f"Low: {data['Low'].min():.2f}"
+                    }
+
+                else:
+                    st.warning(f"No historical data found for '{market_ticker}' in the specified date range. Please check the ticker symbol or date range.")
+                    st.session_state['ai_summary_data']['Market Trend Visualization'] = {
+                        "ticker": market_ticker,
+                        "date_range": f"{chart_start_date} to {chart_end_date}",
+                        "data_summary": "No data found."
+                    }
+
+            except Exception as e:
+                st.error(f"Error fetching market data for {market_ticker}: {e}. Ensure the ticker is correct and try again.")
+                st.session_state['ai_summary_data']['Market Trend Visualization'] = {
+                    "ticker": market_ticker,
+                    "date_range": f"{chart_start_date} to {chart_end_date}",
+                    "data_summary": f"Error: {e}"
+                }
+    else:
+        st.warning("Please enter a ticker symbol to fetch market trends.")
+# --- END NEW SECTION ---
+
+
 # --- Latest Financial News Section ---
 st.markdown("---")
 st.header("📰 Latest Financial News")
@@ -431,7 +515,7 @@ if st.button("Get Company Financials", key="get_company_financials_btn"):
     else:
         st.warning("Please enter a company stock ticker.")
 
-# --- MOVED: AI Summary Section (Now before Ask the AI) ---
+# --- AI Summary Section ---
 st.markdown("---")
 st.header("🧠 AI Summary")
 st.write("Click the button below to get an AI-generated summary and commentary on the outputs from the features you've used above.")
@@ -466,6 +550,10 @@ if st.button("Generate AI Summary", key="generate_ai_summary_btn"):
             elif feature_name == "FRED Data":
                 summary_prompt_parts.append(f"FRED Series ID: {data['series_id']}")
                 summary_prompt_parts.append(f"Data Summary:\n{data['data_summary']}")
+            elif feature_name == "Market Trend Visualization": # NEW CASE
+                summary_prompt_parts.append(f"Ticker: {data['ticker']}")
+                summary_prompt_parts.append(f"Date Range: {data['date_range']}")
+                summary_prompt_parts.append(f"Summary: {data['data_summary']}")
             elif feature_name == "Financial News":
                 summary_prompt_parts.append(f"Number of Articles: {data['number_of_articles']}")
                 summary_prompt_parts.append(f"Articles:\n{data['articles_summary']}")
@@ -488,7 +576,7 @@ if st.button("Generate AI Summary", key="generate_ai_summary_btn"):
             except Exception as e:
                 st.error(f"Error calling Gemini AI for summary: {e}. This might be due to the prompt being too long or other API issues. Try using fewer features or shorter inputs.")
 
-# --- MOVED: Ask the AI Section (Now after AI Summary) ---
+# --- Ask the AI Section ---
 st.markdown("---")
 st.header("💬 Ask the AI")
 user_question = st.text_area("Ask your financial question:", key="ai_question_area")
