@@ -10,9 +10,10 @@ import google.generativeai as genai
 from pypdf import PdfReader
 from fredapi import Fred
 import yfinance as yf
-from datetime import datetime, timedelta # IMPORTANT: Ensure this is at the very top
+from datetime import datetime, timedelta # IMPORTANT: Ensure this is at the very top and NOT duplicated
 import numpy as np # IMPORTANT: Ensure this is at the very top (if you use it for a temporary plot or other numpy operations)
 
+# Assuming 'advisor' module exists and contains these functions
 from advisor import generate_recommendation, search_funds
 
 # IMPORTANT: st.set_page_config MUST be the first Streamlit command
@@ -542,6 +543,7 @@ if st.button("Get Company Financials", key="get_company_financials_btn"):
                 st.session_state['ai_summary_data']['Company Financials'] = {
                     "ticker": company_ticker_av,
                     "statement_type": statement_type_selected,
+                    # Ensure tabulate is installed for .to_markdown() to work
                     "financial_data_head": company_df.head().to_markdown() # Send top rows as markdown
                 }
             else:
