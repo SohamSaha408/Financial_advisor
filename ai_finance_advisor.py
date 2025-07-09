@@ -9,7 +9,9 @@ import requests
 import google.generativeai as genai
 from pypdf import PdfReader
 from fredapi import Fred
-import yfinance as yf # NEW IMPORT
+import yfinance as yf
+from datetime import datetime, timedelta # IMPORTANT: Ensure this is at the very top
+import numpy as np # IMPORTANT: Ensure this is at the very top (if you use it for a temporary plot or other numpy operations)
 
 from advisor import generate_recommendation, search_funds
 
@@ -78,7 +80,7 @@ def set_background(image_file):
         fallback_css = """<style>.stApp {background-color: #222222; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;}</style>"""
         st.markdown(fallback_css, unsafe_allow_html=True)
 
-set_background("black-particles-background.avif")
+set_background("black-particles-background.avif") # Ensure this file exists in your project directory
 
 # --- Initialize session state for AI summary inputs ---
 if 'ai_summary_data' not in st.session_state:
@@ -359,7 +361,7 @@ if st.button("Get FRED Data", key="fetch_fred_data_btn"):
         st.warning("Please enter a FRED Series ID to fetch data.")
 
 
-# --- NEW: Market Trends Visualization Section ---
+# --- Market Trends Visualization Section ---
 st.markdown("---")
 st.header("📈 Market Trends Visualization (Candlestick)")
 st.write("Visualize historical price trends for Nifty 50 or other stock/index symbols.")
@@ -372,8 +374,6 @@ market_ticker = st.text_input(
 ).strip().upper()
 
 # Set default start date to 1 year ago and end date to today
-# These datetime imports should be at the top of your file, but included here for context
-# from datetime import datetime, timedelta
 end_date = datetime.now().date()
 start_date = end_date - timedelta(days=365) # One year ago
 
@@ -445,21 +445,27 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
 
                     # --- Capture for AI Summary ---
                     # Safely get the first/last values for summary
-                    first_open = data['Open'].iloc[0] if not data['Open'].empty else 'N/A'
-                    last_close = data['Close'].iloc[-1] if not data['Close'].empty else 'N/A'
-                    max_high = data['High'].max() if not data['High'].empty else 'N/A'
-                    min_low = data['Low'].min() if not data['Low'].empty else 'N/A'
+                    # Ensure these are actual numbers before formatting for the summary string
+                    first_open = data['Open'].iloc[0] if not data['Open'].empty else None
+                    last_close = data['Close'].iloc[-1] if not data['Close'].empty else None
+                    max_high = data['High'].max() if not data['High'].empty else None
+                    min_low = data['Low'].min() if not data['Low'].empty else None
+
+                    # Construct the data_summary string carefully
+                    summary_parts = [f"Fetched {len(data)} data points."]
+                    if first_open is not None:
+                        summary_parts.append(f"Start Open: {first_open:.2f}")
+                    if last_close is not None:
+                        summary_parts.append(f"End Close: {last_close:.2f}")
+                    if max_high is not None:
+                        summary_parts.append(f"Max High: {max_high:.2f}")
+                    if min_low is not None:
+                        summary_parts.append(f"Min Low: {min_low:.2f}")
 
                     st.session_state['ai_summary_data']['Market Trend Visualization'] = {
                         "ticker": market_ticker,
                         "date_range": f"{chart_start_date} to {chart_end_date}",
-                        "data_summary": (
-                            f"Fetched {len(data)} data points. "
-                            f"Start Open: {first_open:.2f}, "
-                            f"End Close: {last_close:.2f}, "
-                            f"Max High: {max_high:.2f}, "
-                            f"Min Low: {min_low:.2f}"
-                        ) if isinstance(first_open, (int, float)) and isinstance(last_close, (int, float)) and isinstance(max_high, (int, float)) and isinstance(min_low, (int, float)) else "Data summary not available due to missing values or non-numeric data."
+                        "data_summary": ", ".join(summary_parts) # Join parts with a comma and space
                     }
 
             except Exception as e:
@@ -472,7 +478,6 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
     else:
         st.warning("Please enter a ticker symbol to fetch market trends.")
 # --- END Market Trends Visualization Section ---
-
 
 
 # --- Latest Financial News Section ---
