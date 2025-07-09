@@ -366,7 +366,7 @@ if st.button("Get FRED Data", key="fetch_fred_data_btn"):
 st.markdown("---")
 st.header("📈 Market Trends Visualization (Candlestick)")
 st.write("Visualize historical price trends for Nifty 50 or other stock/index symbols.")
-st.info("Hint: For Nifty 50, use ticker `^NSEI`. For Reliance Industries, use `RELIANCE.NS`.")
+st.info("Hint: For **Nifty 50**, use ticker `^NSEI`. For **Reliance Industries**, use `RELIANCE.NS`. For **Apple**, use `AAPL`.") # Added AAPL as a common example
 
 market_ticker = st.text_input(
     "Enter Stock/Index Ticker Symbol (e.g., ^NSEI, RELIANCE.NS):",
@@ -389,10 +389,22 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
     if market_ticker:
         with st.spinner(f"Fetching historical data for {market_ticker}..."):
             try:
-                # Fetch data using yfinance
+                # Ensure dates are in correct format for yfinance (it handles datetime.date objects fine)
                 data = yf.download(market_ticker, start=chart_start_date, end=chart_end_date)
 
-                if not data.empty:
+                # --- DEBUGGING STEP: Display the raw data ---
+                if data.empty:
+                    st.warning(f"No historical data found for '{market_ticker}' in the specified date range ({chart_start_date} to {chart_end_date}). This could be due to an incorrect ticker, an unsupported date range, or no trading activity.")
+                    st.session_state['ai_summary_data']['Market Trend Visualization'] = {
+                        "ticker": market_ticker,
+                        "date_range": f"{chart_start_date} to {chart_end_date}",
+                        "data_summary": "No data found."
+                    }
+                else:
+                    st.write("--- Raw Data Fetched (Head) ---")
+                    st.dataframe(data.head()) # Show the first few rows of data to verify
+                    st.write("-----------------------------")
+
                     st.subheader(f"Candlestick Chart for {market_ticker}")
                     fig = go.Figure(data=[go.Candlestick(
                         x=data.index,
@@ -430,25 +442,15 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
                             f"End Close: {last_close:.2f}, "
                             f"Max High: {max_high:.2f}, "
                             f"Min Low: {min_low:.2f}"
-                        ) if isinstance(first_open, (int, float)) and isinstance(last_close, (int, float)) else "Data summary not available due to missing values."
-                    }
-
-                else:
-                    st.warning(f"No historical data found for '{market_ticker}' in the specified date range. Please check the ticker symbol or date range.")
-                    st.session_state['ai_summary_data']['Market Trend Visualization'] = {
-                        "ticker": market_ticker,
-                        "date_range": f"{chart_start_date} to {chart_end_date}",
-                        "data_summary": "No data found."
+                        ) if isinstance(first_open, (int, float)) and isinstance(last_close, (int, float)) else "Data summary not available due to missing values or non-numeric data."
                     }
 
             except Exception as e:
-                # Catching specific yfinance errors might be better, but a general catch for now.
-                # Common yfinance errors include invalid ticker or no data for the period.
-                st.error(f"Error fetching market data for {market_ticker}: {e}. Ensure the ticker is correct and try again.")
+                st.error(f"An error occurred while fetching or plotting market data for {market_ticker}: {e}. Please ensure the ticker is correct and try again with a valid date range.")
                 st.session_state['ai_summary_data']['Market Trend Visualization'] = {
                     "ticker": market_ticker,
                     "date_range": f"{chart_start_date} to {chart_end_date}",
-                    "data_summary": f"Error during fetch: {e}"
+                    "data_summary": f"Error during fetch/plot: {e}"
                 }
     else:
         st.warning("Please enter a ticker symbol to fetch market trends.")
