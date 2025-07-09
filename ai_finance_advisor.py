@@ -1,19 +1,6 @@
+# ai_financial_advisor.py (Full version with scrolling + features)
+
 import streamlit as st
-
-import streamlit.components.v1 as components
-
-# Inject scrollToElement JS function
-components.html("""
-<script>
-function scrollToElement(id) {
-    const element = document.getElementById(id);
-    if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-    }
-}
-</script>
-""", height=0)
-
 import pandas as pd
 import re
 import base64
@@ -26,222 +13,114 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import numpy as np
 
-# Assuming 'advisor' module exists and contains these functions
+# External logic
 from advisor import generate_recommendation, search_funds
 
-# IMPORTANT: st.set_page_config MUST be the first Streamlit command
+# --- Page Setup ---
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
 
-# --- JavaScript for Scrolling (MODIFIED HERE) ---
-# This script defines a function to scroll to an HTML element by its ID.
-# It's injected once at the start and can be called by Streamlit buttons.
+# --- JavaScript for Scrolling ---
 st.markdown("""
 <script>
-    function scrollToElement(id) {
-        var element = document.getElementById(id);
-        if (element) {
-            // Increased delay to 500ms to give Streamlit more time to render
-            setTimeout(() => {
-                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 500);
-        } else {
-            // Log a warning to the browser console if the element is not found
-            console.warn("Scroll target element with ID '" + id + "' not found.");
-        }
+function scrollToElement(id) {
+    var el = document.getElementById(id);
+    if (el) {
+        setTimeout(() => {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
+    } else {
+        console.warn("Scroll target with ID '" + id + "' not found.");
     }
+}
 </script>
 """, unsafe_allow_html=True)
 
-
-# --- 1. Background and Initial CSS ---
+# --- Background Styling ---
 def set_background(image_file):
     if not os.path.exists(image_file):
-        st.error(f"Background image not found: '{image_file}'. Please ensure the image is in the correct directory.")
-        fallback_css = """<style>.stApp {background-color: #222222; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;}</style>"""
-        st.markdown(fallback_css, unsafe_allow_html=True)
+        st.error(f"Missing background image: {image_file}")
         return
+    with open(image_file, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode()
+    css = f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/png;base64,{encoded}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        color: white;
+    }}
+    .block-container {{
+        background-color: rgba(0,0,0,0.75);
+        padding: 2rem;
+        border-radius: 1rem;
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
 
-    try:
-        with open(image_file, "rb") as f:
-            data = f.read()
-        encoded = base64.b64encode(data).decode()
-        css = f"""
-        <style>
-        .stApp {{
-            background-image: url("data:image/png;base64,{encoded}");
-            background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }}
-        .main .block-container {{
-            background-color: rgba(0, 0, 0, 0.75); padding: 2rem; border-radius: 1rem; margin: 2rem auto;
-            max-width: 700px; width: 90%; color: white; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); overflow: auto;
-        }}
-        .stMarkdown, .stText, .stLabel, .stTextInput > div > label, .stNumberInput > label, .stSelectbox > label, .stTextArea > label {{
-            color: white !important;
-        }}
-        h1, h2, h3, h4, h5, h6 {{
-            color: #E0E0E0 !important; text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
-        }}
-        .stButton>button {{
-            background-color: #4CAF50; color: white; border-radius: 0.5rem; border: none;
-            padding: 0.75rem 1.5rem; font-size: 1rem; cursor: pointer; transition: background-color 0.3s;
-        }}
-        .stButton>button:hover {{
-            background-color: #45a049;
-        }}
-        .stTextInput, .stNumberInput, .stSelectbox, .stTextArea {{
-            background-color: rgba(255, 255, 255, 0.1); border-radius: 0.5rem; padding: 0.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }}
-        .stTextInput > div > div > input, .stNumberInput > div > div > input, .stTextArea > div > div > textarea {{
-            color: white; background-color: transparent; border: none;
-        }}
-        .stSelectbox > div > div[data-baseweb="select"] > div[role="button"] {{
-            color: white; background-color: transparent; border: none;
-        }}
-        .stSelectbox div[data-baseweb="select"] div[role="listbox"] {{
-            background-color: rgba(0, 0, 0, 0.9); color: white;
-        }}
-        </style>
-        """
-        st.markdown(css, unsafe_allow_html=True)
-    except FileNotFoundError:
-        st.error(f"Error loading background image '{image_file}'. Please check the file path and name.")
-        fallback_css = """<style>.stApp {background-color: #222222; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;}</style>"""
-        st.markdown(fallback_css, unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"An unexpected error occurred while setting background: {e}")
-        fallback_css = """<style>.stApp {background-color: #222222; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;}</style>"""
-        st.markdown(fallback_css, unsafe_allow_html=True)
+set_background("black-particles-background.avif")
 
-set_background("black-particles-background.avif") # Ensure this file exists in your project directory
+# --- Sidebar Dashboard ---
+st.sidebar.title("📋 Dashboard")
+sections = [
+    ("Investment Plan", "investment_plan"),
+    ("Mutual Fund Research", "mutual_fund_research"),
+    ("Document Analyzer", "document_analyzer"),
+    ("Economic Data (FRED)", "fred_data"),
+    ("Market Trends Data", "market_trends_data"),
+    ("Latest Financial News", "financial_news"),
+    ("Company Financials", "company_financials"),
+    ("AI Summary", "ai_summary"),
+    ("Ask the AI", "ask_the_ai")
+]
+for label, anchor_id in sections:
+    st.sidebar.button(label, on_click=lambda id=anchor_id: st.markdown(f"<script>scrollToElement('{id}')</script>", unsafe_allow_html=True))
 
-# --- Initialize session state for AI summary inputs ---
+# --- Initialize state ---
 if 'ai_summary_data' not in st.session_state:
     st.session_state['ai_summary_data'] = {}
 
-
-# --- Sidebar Navigation (Dashboard) ---
-st.sidebar.title("App Navigation")
-if st.sidebar.button("Investment Plan"):
-    st.markdown("<script>scrollToElement('investment_plan')</script>", unsafe_allow_html=True)
-if st.sidebar.button("Mutual Fund Research"):
-    st.markdown("<script>scrollToElement('mutual_fund_research')</script>", unsafe_allow_html=True)
-if st.sidebar.button("Document Analyzer"):
-    st.markdown("<script>scrollToElement('document_analyzer')</script>", unsafe_allow_html=True)
-if st.sidebar.button("Economic Data (FRED)"):
-    st.markdown("<script>scrollToElement('fred_data')</script>", unsafe_allow_html=True)
-if st.sidebar.button("Market Trends Data"):
-    st.markdown("<script>scrollToElement('market_trends_data')</script>", unsafe_allow_html=True)
-if st.sidebar.button("Latest Financial News"):
-    st.markdown("<script>scrollToElement('financial_news')</script>", unsafe_allow_html=True)
-if st.sidebar.button("Company Financials"):
-    st.markdown("<script>scrollToElement('company_financials')</script>", unsafe_allow_html=True)
-if st.sidebar.button("AI Summary"):
-    st.markdown("<script>scrollToElement('ai_summary')</script>", unsafe_allow_html=True)
-if st.sidebar.button("Ask the AI"):
-    st.markdown("<script>scrollToElement('ask_the_ai')</script>", unsafe_allow_html=True)
-
-
-# --- 2. Main App Logic ---
-
+# --- Define helper functions ---
 def extract_amount(value_str):
-    match = re.search(r"₹([0-9]+)", value_str)
+    match = re.search(r"\u20b9([0-9]+)", value_str)
     return int(match.group(1)) if match else 0
 
 def get_pdf_text(pdf_file):
-    text = ""
     try:
-        pdf_reader = PdfReader(pdf_file)
-        for page in pdf_reader.pages:
-            text += page.extract_text()
+        return "".join([page.extract_text() for page in PdfReader(pdf_file).pages])
     except Exception as e:
-        st.error(f"Error reading PDF: {e}")
-    return text
+        st.error(f"PDF read error: {e}")
+        return ""
 
 def get_fred_data(series_id, start_date=None, end_date=None):
     try:
-        fred_api_key = st.secrets["fred"]["api_key"]
-        fred = Fred(api_key=fred_api_key)
+        fred = Fred(api_key=st.secrets["fred"]["api_key"])
         data = fred.get_series(series_id, observation_start=start_date, observation_end=end_date)
-        if data is not None and not data.empty:
-            df = pd.DataFrame(data)
-            df.columns = [series_id]
-            df.index.name = 'Date'
-            return df
-        else:
-            st.warning(f"No data found for FRED Series ID: `{series_id}`. Please check the ID.")
-            return None
-    except KeyError:
-        st.error("FRED API key not found in Streamlit secrets. Please set it as `fred.api_key` in .streamlit/secrets.toml or Streamlit Cloud secrets.")
-        return None
+        return pd.DataFrame(data).rename(columns={0: series_id}) if not data.empty else None
     except Exception as e:
-        st.error(f"An error occurred while fetching FRED data: {e}")
+        st.error(f"FRED error: {e}")
         return None
 
-# --- Function to fetch financial news ---
-def get_financial_news(query="finance OR economy OR stock market OR investing", language="en", page_size=5):
+def get_financial_news(query="finance", language="en", page_size=5):
     try:
-        news_api_key = st.secrets["newsapi"]["api_key"]
         url = (
-            f"https://newsapi.org/v2/everything?"
-            f"q={query}&"
-            f"language={language}&"
-            f"sortBy=publishedAt&"
-            f"pageSize={page_size}&"
-            f"apiKey={news_api_key}"
+            f"https://newsapi.org/v2/everything?q={query}&language={language}&pageSize={page_size}&"
+            f"apiKey={st.secrets['newsapi']['api_key']}"
         )
-        response = requests.get(url)
-        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
-        articles = response.json().get("articles", [])
-        return articles
-    except KeyError:
-        st.error("NewsAPI API key not found in Streamlit secrets. Please set it as `newsapi.api_key`.")
-        return []
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching news from NewsAPI.org: {e}")
-        return []
+        return requests.get(url).json().get("articles", [])
     except Exception as e:
-        st.error(f"An unexpected error occurred while fetching news: {e}")
+        st.error(f"News fetch error: {e}")
         return []
 
-# --- Function to fetch company financial statements via Alpha Vantage ---
 def get_company_financials(symbol, statement_type="INCOME_STATEMENT"):
     try:
-        av_api_key = st.secrets["alphavantage"]["api_key"]
-        url = f"https://www.alphavantage.co/query?function={statement_type}&symbol={symbol}&apikey={av_api_key}"
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-
-        if "annualReports" in data:
-            st.subheader(f"Annual {statement_type.replace('_', ' ').title()} for {symbol}")
-            df = pd.DataFrame(data["annualReports"])
-            numeric_cols = [col for col in df.columns if col not in ['fiscalDateEnding', 'reportedCurrency']]
-            for col in numeric_cols:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-
-            desired_order = ['fiscalDateEnding', 'reportedCurrency', 'totalRevenue', 'netIncome', 'earningsPerShare', 'totalShareholderEquity']
-            ordered_cols = [col for col in desired_order if col in df.columns] + \
-                           [col for col in df.columns if col not in desired_order]
-            df = df[ordered_cols]
-
-            st.dataframe(df.set_index('fiscalDateEnding'))
-            return df
-        elif "Note" in data:
-            st.warning(f"Alpha Vantage API note for {symbol}: {data['Note']}. This often indicates a rate limit, an invalid symbol, or no data for the requested function.")
-        else:
-            st.warning(f"No {statement_type.replace('_', ' ').lower()} data found for {symbol}. Check the symbol or API key.")
-        return None
-    except KeyError:
-        st.error("Alpha Vantage API key not found in Streamlit secrets. Please add `alphavantage.api_key` to .streamlit/secrets.toml or Streamlit Cloud secrets.")
-        return None
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching financial statements for {symbol}: {e}. Check API key or internet connection.")
-        return None
+        url = f"https://www.alphavantage.co/query?function={statement_type}&symbol={symbol}&apikey={st.secrets['alphavantage']['api_key']}"
+        data = requests.get(url).json()
+        return pd.DataFrame(data.get("annualReports", [])) if "annualReports" in data else None
     except Exception as e:
-        st.error(f"An unexpected error occurred while fetching financial statements: {e}")
+        st.error(f"Alpha Vantage error: {e}")
         return None
 
 
