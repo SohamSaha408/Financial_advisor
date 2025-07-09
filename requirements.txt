@@ -9,4 +9,4 @@ pandas
 google-generativeai
 pypdf
 fredapi
-
+tabulate
