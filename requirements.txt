@@ -9,5 +9,5 @@ pandas
 google-generativeai
 pypdf
 fredapi
-transformer
+transformers
 tensorflow
