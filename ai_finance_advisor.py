@@ -5,10 +5,13 @@ import plotly.graph_objects as go
 import re
 import base64
 import os
-import requests # <-- NEW: Import requests for API calls
+import requests
 import google.generativeai as genai
 from pypdf import PdfReader
 from fredapi import Fred
+# --- NEW IMPORT FOR HUGGING FACE ---
+from transformers import pipeline
+# --- END NEW IMPORT ---
 
 from advisor import generate_recommendation, search_funds
 
@@ -115,7 +118,7 @@ def get_fred_data(series_id, start_date=None, end_date=None):
         st.error(f"An error occurred while fetching FRED data: {e}")
         return None
 
-# --- NEW: Function to fetch financial news ---
+# --- Function to fetch financial news ---
 def get_financial_news(query="finance OR economy OR stock market OR investing", language="en", page_size=5):
     try:
         news_api_key = st.secrets["newsapi"]["api_key"]
@@ -141,9 +144,68 @@ def get_financial_news(query="finance OR economy OR stock market OR investing", 
         st.error(f"An unexpected error occurred while fetching news: {e}")
         return []
 
+# --- Function to fetch company financial statements via Alpha Vantage ---
+def get_company_financials(symbol, statement_type="INCOME_STATEMENT"):
+    try:
+        av_api_key = st.secrets["alphavantage"]["api_key"]
+        url = f"https://www.alphavantage.co/query?function={statement_type}&symbol={symbol}&apikey={av_api_key}"
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+
+        if "annualReports" in data:
+            st.subheader(f"Annual {statement_type.replace('_', ' ').title()} for {symbol}")
+            df = pd.DataFrame(data["annualReports"])
+            numeric_cols = [col for col in df.columns if col not in ['fiscalDateEnding', 'reportedCurrency']]
+            for col in numeric_cols:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+            desired_order = ['fiscalDateEnding', 'reportedCurrency', 'totalRevenue', 'netIncome', 'earningsPerShare', 'totalShareholderEquity']
+            ordered_cols = [col for col in desired_order if col in df.columns] + \
+                           [col for col in df.columns if col not in desired_order]
+            df = df[ordered_cols]
+
+            st.dataframe(df.set_index('fiscalDateEnding'))
+            return df
+        elif "Note" in data:
+            st.warning(f"Alpha Vantage API note for {symbol}: {data['Note']}. This often indicates a rate limit, an invalid symbol, or no data for the requested function.")
+        else:
+            st.warning(f"No {statement_type.replace('_', ' ').lower()} data found for {symbol}. Check the symbol or API key.")
+        return None
+    except KeyError:
+        st.error("Alpha Vantage API key not found in Streamlit secrets. Please add `alphavantage.api_key` to .streamlit/secrets.toml or Streamlit Cloud secrets.")
+        return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching financial statements for {symbol}: {e}. Check API key or internet connection.")
+        return None
+    except Exception as e:
+        st.error(f"An unexpected error occurred while fetching financial statements: {e}")
+        return None
+
+# --- NEW: Hugging Face Model Loading and Sentiment Analysis ---
+@st.cache_resource
+def load_sentiment_model():
+    """Loads a pre-trained sentiment analysis model from Hugging Face."""
+    try:
+        # This is a common, relatively lightweight sentiment model
+        model_name = "distilbert-base-uncased-finetuned-sst-2-english"
+        # Download and load the model and tokenizer
+        classifier = pipeline("sentiment-analysis", model=model_name)
+        st.success(f"Sentiment model '{model_name}' loaded successfully!")
+        return classifier
+    except Exception as e:
+        st.error(f"Error loading Hugging Face sentiment model: {e}. "
+                 "Ensure 'transformers' and 'torch' (or 'tensorflow') are installed in requirements.txt.")
+        return None
+
+# Load the model once at startup
+sentiment_classifier = load_sentiment_model()
+# --- END NEW HUGGING FACE SECTION ---
+
+
 # --- Streamlit App Layout ---
 
-st.title(" AI Financial Advisor")
+st.title("💸 AI Financial Advisor")
 st.header("📊 Get Your Investment Plan")
 
 age = st.number_input("Age", min_value=18, key="age_input")
@@ -156,7 +218,7 @@ goal = st.selectbox("🎯 Investment Goal", [
 
 if st.button("Get Advice", key="get_advice_btn"):
     result = generate_recommendation(age, income, profession, region, goal)
-    st.subheader(" Advice")
+    st.subheader("🧠 Advice")
     st.markdown(f"<p style='color: white;'>{result['advice_text']}</p>", unsafe_allow_html=True)
 
     st.subheader("📊 Allocation Chart")
@@ -276,33 +338,71 @@ if st.button("Get FRED Data", key="fetch_fred_data_btn"):
     else:
         st.warning("Please enter a FRED Series ID to fetch data.")
 
-# --- NEW: Latest Financial News Section ---
+# --- Latest Financial News Section ---
 st.markdown("---")
 st.header("📰 Latest Financial News")
 st.write("Current top financial headlines from around the world.")
 
 if st.button("Refresh News", key="refresh_news_btn"):
     with st.spinner("Fetching latest news..."):
-        # You can customize the query, language, and page_size
-        # For example, query="Indian finance" to be more specific to India
-        # NewsAPI.org free tier limits requests, so be mindful of frequent refreshes.
         articles = get_financial_news(query="finance OR economy OR stock market OR investing", language="en", page_size=5)
 
         if articles:
             for i, article in enumerate(articles):
                 st.subheader(f"{i+1}. {article.get('title', 'No Title')}")
-                st.write(f"**Source:** {article.get('source', {}).get('name', 'N/A')} - **Published:** {pd.to_datetime(article.get('publishedAt')).strftime('%Y-%m-%d %H:%M')}")
+                published_date = article.get('publishedAt')
+                if published_date:
+                    try:
+                        published_date = pd.to_datetime(published_date).strftime('%Y-%m-%d %H:%M')
+                    except ValueError:
+                        published_date = "N/A"
+                else:
+                    published_date = "N/A"
+                st.write(f"**Source:** {article.get('source', {}).get('name', 'N/A')} - **Published:** {published_date}")
                 st.write(article.get('description', 'No description available.'))
                 st.markdown(f"[Read Full Article]({article.get('url', '#')})")
                 st.markdown("---")
         else:
             st.info("Could not fetch financial news at this moment. Please try again later.")
 
+# --- Company Financials (via SEC EDGAR/Alpha Vantage) Section ---
+st.markdown("---")
+st.header("🏢 Company Financials (via Alpha Vantage)")
+st.write("Get key financial statements (e.g., Income Statement) for publicly traded companies using their ticker symbol.")
+
+company_ticker_av = st.text_input(
+    "Enter Company Stock Ticker (e.g., IBM, GOOGL, MSFT):",
+    key="company_ticker_av_input"
+).strip().upper()
+
+statement_type_selected = st.selectbox(
+    "Select Statement Type:",
+    options=["INCOME_STATEMENT", "BALANCE_SHEET", "CASH_FLOW"],
+    key="statement_type_select"
+)
+
+if st.button("Get Company Financials", key="get_company_financials_btn"):
+    if company_ticker_av:
+        with st.spinner(f"Fetching {statement_type_selected.replace('_', ' ').lower()} for {company_ticker_av}..."):
+            get_company_financials(company_ticker_av, statement_type=statement_type_selected)
+    else:
+        st.warning("Please enter a company stock ticker.")
+
+
 st.markdown("---")
 st.header("💬 Ask the AI")
 user_question = st.text_area("Ask your financial question:", key="ai_question_area")
 
 if user_question:
+    # --- Option for Hugging Face Sentiment Analysis (if model loaded) ---
+    if sentiment_classifier:
+        with st.spinner("Analyzing sentiment with Hugging Face..."):
+            hf_sentiment_result = sentiment_classifier(user_question)[0]
+            st.info(f"Hugging Face Sentiment: **{hf_sentiment_result['label']}** (Confidence: {hf_sentiment_result['score']:.2f})")
+    else:
+        st.warning("Hugging Face sentiment model not loaded. Please check logs for errors or confirm dependencies.")
+    # --- END Hugging Face Sentiment ---
+
     try:
         genai.configure(api_key=st.secrets["gemini"]["api_key"])
     except KeyError:
@@ -313,9 +413,17 @@ if user_question:
 
     with st.spinner("Thinking..."):
         try:
+            # Original Gemini prompt for financial advice (you can remove the explicit sentiment instruction here
+            # if you prefer to rely solely on the Hugging Face model for sentiment display).
+            # If you want Gemini to *also* comment on sentiment, keep its instruction.
+            prompt = (
+                f"You are a helpful and expert Indian financial advisor. "
+                f"Analyze the user's question and provide your financial advice based on the question.\n\n"
+                f"--- User Question ---\n{user_question}"
+            )
             response = model.generate_content(
                 contents=[
-                    {"role": "user", "parts": ["You are a helpful and expert Indian financial advisor.", user_question]}
+                    {"role": "user", "parts": [prompt]}
                 ]
             )
             st.subheader("🤖 AI Says:")
