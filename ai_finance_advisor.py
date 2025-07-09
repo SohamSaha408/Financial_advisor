@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import re
 import base64
 import os
@@ -10,14 +8,33 @@ import google.generativeai as genai
 from pypdf import PdfReader
 from fredapi import Fred
 import yfinance as yf
-from datetime import datetime, timedelta # IMPORTANT: Ensure this is at the very top and NOT duplicated
-import numpy as np # IMPORTANT: Ensure this is at the very top (if you use it for a temporary plot or other numpy operations)
+from datetime import datetime, timedelta
+import numpy as np
 
 # Assuming 'advisor' module exists and contains these functions
 from advisor import generate_recommendation, search_funds
 
 # IMPORTANT: st.set_page_config MUST be the first Streamlit command
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
+
+# --- JavaScript for Scrolling ---
+# This script defines a function to scroll to an HTML element by its ID.
+# It's injected once at the start and can be called by Streamlit buttons.
+st.markdown("""
+<script>
+    function scrollToElement(id) {
+        var element = document.getElementById(id);
+        if (element) {
+            // Use setTimeout to ensure the DOM has updated before scrolling,
+            // which can happen after a Streamlit rerun.
+            setTimeout(() => {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100); // Small delay to ensure render
+        }
+    }
+</script>
+""", unsafe_allow_html=True)
+
 
 # --- 1. Background and Initial CSS ---
 def set_background(image_file):
@@ -86,6 +103,28 @@ set_background("black-particles-background.avif") # Ensure this file exists in y
 # --- Initialize session state for AI summary inputs ---
 if 'ai_summary_data' not in st.session_state:
     st.session_state['ai_summary_data'] = {}
+
+
+# --- Sidebar Navigation (Dashboard) ---
+st.sidebar.title("App Navigation")
+if st.sidebar.button("Investment Plan"):
+    st.markdown("<script>scrollToElement('investment_plan')</script>", unsafe_allow_html=True)
+if st.sidebar.button("Mutual Fund Research"):
+    st.markdown("<script>scrollToElement('mutual_fund_research')</script>", unsafe_allow_html=True)
+if st.sidebar.button("Document Analyzer"):
+    st.markdown("<script>scrollToElement('document_analyzer')</script>", unsafe_allow_html=True)
+if st.sidebar.button("Economic Data (FRED)"):
+    st.markdown("<script>scrollToElement('fred_data')</script>", unsafe_allow_html=True)
+if st.sidebar.button("Market Trends Data"):
+    st.markdown("<script>scrollToElement('market_trends_data')</script>", unsafe_allow_html=True)
+if st.sidebar.button("Latest Financial News"):
+    st.markdown("<script>scrollToElement('financial_news')</script>", unsafe_allow_html=True)
+if st.sidebar.button("Company Financials"):
+    st.markdown("<script>scrollToElement('company_financials')</script>", unsafe_allow_html=True)
+if st.sidebar.button("AI Summary"):
+    st.markdown("<script>scrollToElement('ai_summary')</script>", unsafe_allow_html=True)
+if st.sidebar.button("Ask the AI"):
+    st.markdown("<script>scrollToElement('ask_the_ai')</script>", unsafe_allow_html=True)
 
 
 # --- 2. Main App Logic ---
@@ -189,9 +228,11 @@ def get_company_financials(symbol, statement_type="INCOME_STATEMENT"):
         return None
 
 
-# --- Streamlit App Layout ---
-
 st.title("💸 AI Financial Advisor")
+
+
+# --- Investment Plan Section ---
+st.markdown("<div id='investment_plan'></div>", unsafe_allow_html=True) # Anchor for scrolling
 st.header("📊 Get Your Investment Plan")
 
 age = st.number_input("Age", min_value=18, key="age_input")
@@ -207,17 +248,16 @@ if st.button("Get Advice", key="get_advice_btn"):
     st.subheader("🧠 Advice")
     st.markdown(f"<p style='color: white;'>{result['advice_text']}</p>", unsafe_allow_html=True)
 
-    st.subheader("📊 Allocation Chart")
+    st.subheader("📊 Allocation Data")
     alloc = result["allocation"]
     eq = extract_amount(alloc["Equity"])
     de = extract_amount(alloc["Debt"])
     go = extract_amount(alloc["Gold"])
-    chart_data = pd.DataFrame({"Type": ["Equity", "Debt", "Gold"], "Amount": [eq, de, go]})
-    fig = px.pie(chart_data, names='Type', values='Amount', title="Investment Split")
-    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-    fig.update_traces(textinfo='percent+label', marker=dict(line=dict(color='#000000', width=1)))
-    fig.update_layout(title_font_color='white', legend_font_color='white')
-    st.plotly_chart(fig, use_container_width=True)
+
+    # Display allocation as text/dataframe instead of chart
+    st.write(f"Equity: ₹{eq:,}")
+    st.write(f"Debt: ₹{de:,}")
+    st.write(f"Gold: ₹{go:,}")
 
     # --- Capture for AI Summary ---
     st.session_state['ai_summary_data']['Investment Plan'] = {
@@ -227,6 +267,10 @@ if st.button("Get Advice", key="get_advice_btn"):
     }
 
 st.markdown("---")
+
+
+# --- Mutual Fund Research Section ---
+st.markdown("<div id='mutual_fund_research'></div>", unsafe_allow_html=True) # Anchor for scrolling
 st.header("🔍 Mutual Fund Research")
 search_query = st.text_input("Enter fund name to search", key="fund_search_input")
 if search_query:
@@ -249,10 +293,11 @@ if search_query:
             "query": search_query,
             "results": "No funds found."
         }
+st.markdown("---")
 
 
 # --- Document Analyzer Section ---
-st.markdown("---")
+st.markdown("<div id='document_analyzer'></div>", unsafe_allow_html=True) # Anchor for scrolling
 st.header("📄 Document Analyzer")
 st.write("Upload a document (PDF or TXT) for the AI to analyze and provide advice.")
 uploaded_file = st.file_uploader("Choose a file", type=["pdf", "txt"], key="doc_uploader")
@@ -313,12 +358,13 @@ if uploaded_file is not None:
                 st.warning("Please enter a question to analyze the document.")
     else:
         st.warning("Could not extract text from the uploaded document. Please try another file or ensure it's a readable PDF/TXT.")
+st.markdown("---")
 
 
 # --- Economic Data from FRED Section ---
-st.markdown("---")
+st.markdown("<div id='fred_data'></div>", unsafe_allow_html=True) # Anchor for scrolling
 st.header("📈 Economic Data from FRED")
-st.write("Enter a FRED Series ID (e.g., `UNRATE` for Unemployment Rate, `GDP` for Gross Domestic Product) to visualize economic data.")
+st.write("Enter a FRED Series ID (e.g., `UNRATE` for Unemployment Rate, `GDP` for Gross Domestic Product) to view economic data.")
 
 fred_series_id = st.text_input(
     "FRED Series ID:",
@@ -335,18 +381,6 @@ if st.button("Get FRED Data", key="fetch_fred_data_btn"):
                 st.subheader(f"Latest Data for {fred_series_id}")
                 st.dataframe(fred_df.tail())
 
-                fig = go.Figure(data=go.Scatter(x=fred_df.index, y=fred_df[fred_series_id], mode='lines+markers', name=fred_series_id))
-                fig.update_layout(
-                    title=f"{fred_series_id} Over Time",
-                    xaxis_title="Date",
-                    yaxis_title="Value",
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    font_color='white',
-                    xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.2)'),
-                    yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.2)')
-                )
-                st.plotly_chart(fig, use_container_width=True)
                 # --- Capture for AI Summary ---
                 st.session_state['ai_summary_data']['FRED Data'] = {
                     "series_id": fred_series_id,
@@ -360,12 +394,13 @@ if st.button("Get FRED Data", key="fetch_fred_data_btn"):
                 }
     else:
         st.warning("Please enter a FRED Series ID to fetch data.")
-
-
-# --- Market Trends Visualization Section ---
 st.markdown("---")
-st.header("📈 Market Trends Visualization (Candlestick)")
-st.write("Visualize historical price trends for Nifty 50 or other stock/index symbols.")
+
+
+# --- Market Trends Data Section ---
+st.markdown("<div id='market_trends_data'></div>", unsafe_allow_html=True) # Anchor for scrolling
+st.header("📊 Market Trends Data (Raw Data Only)")
+st.write("View raw historical data for Nifty 50 or other stock/index symbols.")
 st.info("Hint: For **Nifty 50**, use ticker `^NSEI`. For **Reliance Industries**, use `RELIANCE.NS`. For **Apple**, use `AAPL`.")
 
 market_ticker = st.text_input(
@@ -384,14 +419,13 @@ with col1:
 with col2:
     chart_end_date = st.date_input("End Date", value=end_date, key="chart_end_date")
 
-if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
+if st.button("Get Market Data", key="get_market_data_btn"): # Changed button text
     if market_ticker:
         with st.spinner(f"Fetching historical data for {market_ticker}..."):
             try:
                 # Fetch data using yfinance
                 data = yf.download(market_ticker, start=chart_start_date, end=chart_end_date)
 
-                # --- DEBUGGING STEP: Display the raw data ---
                 if data.empty:
                     st.warning(f"No historical data found for '{market_ticker}' in the specified date range ({chart_start_date} to {chart_end_date}). This could be due to an incorrect ticker, an unsupported date range, or no trading activity.")
                     st.session_state['ai_summary_data']['Market Trend Visualization'] = {
@@ -402,57 +436,16 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
                 else:
                     st.write("--- Raw Data Fetched (Head) ---")
                     st.dataframe(data.head()) # Show the first few rows of data to verify
+                    st.write("--- Raw Data Fetched (Tail) ---")
+                    st.dataframe(data.tail()) # Also show tail to give more context if data is large
                     st.write("-----------------------------")
 
-                    st.subheader(f"Candlestick Chart for {market_ticker}")
-                    fig = go.Figure(data=[go.Candlestick(
-                        x=data.index,
-                        open=data['Open'],
-                        high=data['High'],
-                        low=data['Low'],
-                        close=data['Close'],
-                        # Ensure candlestick colors are distinct and visible
-                        increasing_line_color='green',  # Green for increasing
-                        decreasing_line_color='red',    # Red for decreasing
-                        increasing_fillcolor='rgba(0,255,0,0.6)', # Slightly transparent green fill
-                        decreasing_fillcolor='rgba(255,0,0,0.6)'  # Slightly transparent red fill
-                    )])
-                    fig.update_layout(
-                        title=f"{market_ticker} Price Trend ({chart_start_date} to {chart_end_date})",
-                        xaxis_title="Date",
-                        yaxis_title="Price", # Using yaxis_title, as it's common in go.Figure
-                        xaxis_rangeslider_visible=False, # Hide the range slider for cleaner look
-                        paper_bgcolor='rgba(0,0,0,0)', # Transparent background for the entire chart area
-                        plot_bgcolor='rgba(0,0,0,0)', # Transparent background for the plotting area
-                        font_color='white', # Default font color for general text
-                        title_font_color='white', # Title font color
-                        legend_font_color='white', # Legend font color if applicable
-                        xaxis=dict(
-                            showgrid=True,
-                            gridcolor='rgba(255,255,255,0.2)', # Lighter grid lines
-                            tickfont=dict(color='white'),    # X-axis tick labels
-                            title_font_color='white',         # X-axis title
-                            linecolor='white'                 # X-axis line
-                        ),
-                        yaxis=dict(
-                            showgrid=True,
-                            gridcolor='rgba(255,255,255,0.2)', # Lighter grid lines
-                            tickfont=dict(color='white'),    # Y-axis tick labels
-                            title_font_color='white',         # Y-axis title
-                            linecolor='white'                 # Y-axis line
-                        )
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-
                     # --- Capture for AI Summary ---
-                    # Safely get the first/last values for summary
-                    # Ensure these are actual numbers before formatting for the summary string
                     first_open = data['Open'].iloc[0] if not data['Open'].empty else None
                     last_close = data['Close'].iloc[-1] if not data['Close'].empty else None
                     max_high = data['High'].max() if not data['High'].empty else None
                     min_low = data['Low'].min() if not data['Low'].empty else None
 
-                    # Construct the data_summary string carefully
                     summary_parts = [f"Fetched {len(data)} data points."]
                     if first_open is not None:
                         summary_parts.append(f"Start Open: {first_open:.2f}")
@@ -466,23 +459,23 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
                     st.session_state['ai_summary_data']['Market Trend Visualization'] = {
                         "ticker": market_ticker,
                         "date_range": f"{chart_start_date} to {chart_end_date}",
-                        "data_summary": ", ".join(summary_parts) # Join parts with a comma and space
+                        "data_summary": ", ".join(summary_parts)
                     }
 
             except Exception as e:
-                st.error(f"An error occurred while fetching or plotting market data for {market_ticker}: {e}. Please ensure the ticker is correct and try again with a valid date range.")
+                st.error(f"An error occurred while fetching market data for {market_ticker}: {e}. Please ensure the ticker is correct and try again with a valid date range.")
                 st.session_state['ai_summary_data']['Market Trend Visualization'] = {
                     "ticker": market_ticker,
                     "date_range": f"{chart_start_date} to {chart_end_date}",
-                    "data_summary": f"Error during fetch/plot: {e}"
+                    "data_summary": f"Error during fetch: {e}"
                 }
     else:
         st.warning("Please enter a ticker symbol to fetch market trends.")
-# --- END Market Trends Visualization Section ---
+st.markdown("---")
 
 
 # --- Latest Financial News Section ---
-st.markdown("---")
+st.markdown("<div id='financial_news'></div>", unsafe_allow_html=True) # Anchor for scrolling
 st.header("📰 Latest Financial News")
 st.write("Current top financial headlines from around the world.")
 
@@ -517,9 +510,11 @@ if st.button("Refresh News", key="refresh_news_btn"):
                 "number_of_articles": 0,
                 "articles_summary": "No news articles fetched."
             }
-
-# --- Company Financials (via SEC EDGAR/Alpha Vantage) Section ---
 st.markdown("---")
+
+
+# --- Company Financials (via Alpha Vantage) Section ---
+st.markdown("<div id='company_financials'></div>", unsafe_allow_html=True) # Anchor for scrolling
 st.header("🏢 Company Financials (via Alpha Vantage)")
 st.write("Get key financial statements (e.g., Income Statement) for publicly traded companies using their ticker symbol.")
 
@@ -543,8 +538,7 @@ if st.button("Get Company Financials", key="get_company_financials_btn"):
                 st.session_state['ai_summary_data']['Company Financials'] = {
                     "ticker": company_ticker_av,
                     "statement_type": statement_type_selected,
-                    # Ensure tabulate is installed for .to_markdown() to work
-                    "financial_data_head": company_df.head().to_markdown() # Send top rows as markdown
+                    "financial_data_head": company_df.head().to_markdown() # Ensure tabulate is installed for this to work
                 }
             else:
                 st.session_state['ai_summary_data']['Company Financials'] = {
@@ -554,9 +548,11 @@ if st.button("Get Company Financials", key="get_company_financials_btn"):
                 }
     else:
         st.warning("Please enter a company stock ticker.")
+st.markdown("---")
+
 
 # --- AI Summary Section ---
-st.markdown("---")
+st.markdown("<div id='ai_summary'></div>", unsafe_allow_html=True) # Anchor for scrolling
 st.header("🧠 AI Summary")
 st.write("Click the button below to get an AI-generated summary and commentary on the outputs from the features you've used above.")
 
@@ -590,7 +586,7 @@ if st.button("Generate AI Summary", key="generate_ai_summary_btn"):
             elif feature_name == "FRED Data":
                 summary_prompt_parts.append(f"FRED Series ID: {data['series_id']}")
                 summary_prompt_parts.append(f"Data Summary:\n{data['data_summary']}")
-            elif feature_name == "Market Trend Visualization": # NEW CASE
+            elif feature_name == "Market Trend Visualization":
                 summary_prompt_parts.append(f"Ticker: {data['ticker']}")
                 summary_prompt_parts.append(f"Date Range: {data['date_range']}")
                 summary_prompt_parts.append(f"Summary: {data['data_summary']}")
@@ -604,7 +600,7 @@ if st.button("Generate AI Summary", key="generate_ai_summary_btn"):
             elif feature_name == "Direct AI Question":
                 summary_prompt_parts.append(f"User Question: {data['question']}")
                 summary_prompt_parts.append(f"AI Response: {data['ai_response']}")
-            summary_prompt_parts.append("\n") # Add a newline for separation
+            summary_prompt_parts.append("\n")
 
         full_summary_prompt = "\n".join(summary_prompt_parts)
 
@@ -615,9 +611,11 @@ if st.button("Generate AI Summary", key="generate_ai_summary_btn"):
                 st.markdown(f"<p style='color: white;'>{summary_response.text}</p>", unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"Error calling Gemini AI for summary: {e}. This might be due to the prompt being too long or other API issues. Try using fewer features or shorter inputs.")
+st.markdown("---")
+
 
 # --- Ask the AI Section ---
-st.markdown("---")
+st.markdown("<div id='ask_the_ai'></div>", unsafe_allow_html=True) # Anchor for scrolling
 st.header("💬 Ask the AI")
 user_question = st.text_area("Ask your financial question:", key="ai_question_area")
 
