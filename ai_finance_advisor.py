@@ -1,4 +1,19 @@
 import streamlit as st
+
+import streamlit.components.v1 as components
+
+# Inject scrollToElement JS function
+components.html("""
+<script>
+function scrollToElement(id) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+</script>
+""", height=0)
+
 import pandas as pd
 import re
 import base64
@@ -270,6 +285,7 @@ st.markdown("""
   <div class="dashboard-tile" onclick="scrollToElement('ask_the_ai')">💬 Ask the AI</div>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
