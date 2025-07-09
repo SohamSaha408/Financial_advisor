@@ -17,7 +17,7 @@ from advisor import generate_recommendation, search_funds
 # IMPORTANT: st.set_page_config MUST be the first Streamlit command
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
 
-# --- JavaScript for Scrolling ---
+# --- JavaScript for Scrolling (MODIFIED HERE) ---
 # This script defines a function to scroll to an HTML element by its ID.
 # It's injected once at the start and can be called by Streamlit buttons.
 st.markdown("""
@@ -25,11 +25,13 @@ st.markdown("""
     function scrollToElement(id) {
         var element = document.getElementById(id);
         if (element) {
-            // Use setTimeout to ensure the DOM has updated before scrolling,
-            // which can happen after a Streamlit rerun.
+            // Increased delay to 500ms to give Streamlit more time to render
             setTimeout(() => {
                 element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100); // Small delay to ensure render
+            }, 500);
+        } else {
+            // Log a warning to the browser console if the element is not found
+            console.warn("Scroll target element with ID '" + id + "' not found.");
         }
     }
 </script>
@@ -506,7 +508,7 @@ if st.button("Refresh News", key="refresh_news_btn"):
             }
         else:
             st.info("Could not fetch financial news at this moment. Please try again later.")
-            st.session_state['ai_summary_data']['Financial News'] = {
+            st.session_session_state['ai_summary_data']['Financial News'] = {
                 "number_of_articles": 0,
                 "articles_summary": "No news articles fetched."
             }
