@@ -10,8 +10,6 @@ import google.generativeai as genai
 from pypdf import PdfReader
 from fredapi import Fred
 
-
-
 from advisor import generate_recommendation, search_funds
 
 # IMPORTANT: st.set_page_config MUST be the first Streamlit command
@@ -80,6 +78,11 @@ def set_background(image_file):
         st.markdown(fallback_css, unsafe_allow_html=True)
 
 set_background("black-particles-background.avif")
+
+# --- Initialize session state for AI summary inputs ---
+if 'ai_summary_data' not in st.session_state:
+    st.session_state['ai_summary_data'] = {}
+
 
 # --- 2. Main App Logic ---
 
@@ -181,26 +184,6 @@ def get_company_financials(symbol, statement_type="INCOME_STATEMENT"):
         st.error(f"An unexpected error occurred while fetching financial statements: {e}")
         return None
 
-# --- NEW: Hugging Face Model Loading and Sentiment Analysis ---
-@st.cache_resource
-def load_sentiment_model():
-    """Loads a pre-trained sentiment analysis model from Hugging Face."""
-    try:
-        # This is a common, relatively lightweight sentiment model
-        model_name = "distilbert-base-uncased-finetuned-sst-2-english"
-        # Download and load the model and tokenizer
-        classifier = pipeline("sentiment-analysis", model=model_name)
-        st.success(f"Sentiment model '{model_name}' loaded successfully!")
-        return classifier
-    except Exception as e:
-        st.error(f"Error loading Hugging Face sentiment model: {e}. "
-                 "Ensure 'transformers' and 'torch' (or 'tensorflow') are installed in requirements.txt.")
-        return None
-
-# Load the model once at startup
-sentiment_classifier = load_sentiment_model()
-# --- END NEW HUGGING FACE SECTION ---
-
 
 # --- Streamlit App Layout ---
 
@@ -232,15 +215,37 @@ if st.button("Get Advice", key="get_advice_btn"):
     fig.update_layout(title_font_color='white', legend_font_color='white')
     st.plotly_chart(fig, use_container_width=True)
 
+    # --- Capture for AI Summary ---
+    st.session_state['ai_summary_data']['Investment Plan'] = {
+        "user_inputs": f"Age: {age}, Income: {income}, Profession: {profession}, Region: {region}, Goal: {goal}",
+        "advice": result['advice_text'],
+        "allocation": f"Equity: {eq}, Debt: {de}, Gold: {go}"
+    }
+
 st.markdown("---")
 st.header("🔍 Mutual Fund Research")
 search_query = st.text_input("Enter fund name to search", key="fund_search_input")
 if search_query:
     funds = search_funds(search_query)
-    for fund in funds[:5]:
-        st.markdown(f"<p style='color: white;'><b>{fund['schemeName']}</b></p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='color: white;'>Scheme Code: {fund.get('schemeCode', 'N/A')}</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='color: white;'>[Live NAV](https://api.mfapi.in/mf/{fund.get('schemeCode', '')})</p>", unsafe_allow_html=True)
+    found_funds_info = []
+    if funds:
+        for fund in funds[:5]:
+            st.markdown(f"<p style='color: white;'><b>{fund['schemeName']}</b></p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='color: white;'>Scheme Code: {fund.get('schemeCode', 'N/A')}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='color: white;'>[Live NAV](https://api.mfapi.in/mf/{fund.get('schemeCode', '')})</p>", unsafe_allow_html=True)
+            found_funds_info.append(f"{fund['schemeName']} (Code: {fund.get('schemeCode', 'N/A')})")
+        # --- Capture for AI Summary ---
+        st.session_state['ai_summary_data']['Mutual Fund Research'] = {
+            "query": search_query,
+            "results": f"Found {len(funds)} funds. Top 5: {', '.join(found_funds_info)}"
+        }
+    else:
+        st.markdown("<p style='color: white;'>No funds found for your query.</p>", unsafe_allow_html=True)
+        st.session_state['ai_summary_data']['Mutual Fund Research'] = {
+            "query": search_query,
+            "results": "No funds found."
+        }
+
 
 # --- Document Analyzer Section ---
 st.markdown("---")
@@ -293,12 +298,18 @@ if uploaded_file is not None:
                         response = model.generate_content(contents=[{"role": "user", "parts": [prompt]}])
                         st.subheader("🤖 AI's Document Analysis:")
                         st.markdown(f"<p style='color: white;'>{response.text}</p>", unsafe_allow_html=True)
+                        # --- Capture for AI Summary ---
+                        st.session_state['ai_summary_data']['Document Analysis'] = {
+                            "document_question": document_question,
+                            "ai_response": response.text
+                        }
                     except Exception as e:
                         st.error(f"Error calling Gemini AI for document analysis: {e}. This might be due to model token limits or other API issues. Try a shorter document or question.")
             else:
                 st.warning("Please enter a question to analyze the document.")
     else:
         st.warning("Could not extract text from the uploaded document. Please try another file or ensure it's a readable PDF/TXT.")
+
 
 # --- Economic Data from FRED Section ---
 st.markdown("---")
@@ -332,10 +343,20 @@ if st.button("Get FRED Data", key="fetch_fred_data_btn"):
                     yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.2)')
                 )
                 st.plotly_chart(fig, use_container_width=True)
+                # --- Capture for AI Summary ---
+                st.session_state['ai_summary_data']['FRED Data'] = {
+                    "series_id": fred_series_id,
+                    "data_summary": f"Latest 5 observations for {fred_series_id}:\n" + fred_df.tail().to_markdown()
+                }
             else:
                 st.info("No data could be retrieved for the provided FRED Series ID.")
+                st.session_state['ai_summary_data']['FRED Data'] = {
+                    "series_id": fred_series_id,
+                    "data_summary": "No data retrieved."
+                }
     else:
         st.warning("Please enter a FRED Series ID to fetch data.")
+
 
 # --- Latest Financial News Section ---
 st.markdown("---")
@@ -345,7 +366,7 @@ st.write("Current top financial headlines from around the world.")
 if st.button("Refresh News", key="refresh_news_btn"):
     with st.spinner("Fetching latest news..."):
         articles = get_financial_news(query="finance OR economy OR stock market OR investing", language="en", page_size=5)
-
+        news_summary_list = []
         if articles:
             for i, article in enumerate(articles):
                 st.subheader(f"{i+1}. {article.get('title', 'No Title')}")
@@ -361,8 +382,18 @@ if st.button("Refresh News", key="refresh_news_btn"):
                 st.write(article.get('description', 'No description available.'))
                 st.markdown(f"[Read Full Article]({article.get('url', '#')})")
                 st.markdown("---")
+                news_summary_list.append(f"Title: {article.get('title', 'N/A')}, Source: {article.get('source', {}).get('name', 'N/A')}, Description: {article.get('description', 'N/A')[:150]}...")
+            # --- Capture for AI Summary ---
+            st.session_state['ai_summary_data']['Financial News'] = {
+                "number_of_articles": len(articles),
+                "articles_summary": "\n".join(news_summary_list)
+            }
         else:
             st.info("Could not fetch financial news at this moment. Please try again later.")
+            st.session_state['ai_summary_data']['Financial News'] = {
+                "number_of_articles": 0,
+                "articles_summary": "No news articles fetched."
+            }
 
 # --- Company Financials (via SEC EDGAR/Alpha Vantage) Section ---
 st.markdown("---")
@@ -383,25 +414,86 @@ statement_type_selected = st.selectbox(
 if st.button("Get Company Financials", key="get_company_financials_btn"):
     if company_ticker_av:
         with st.spinner(f"Fetching {statement_type_selected.replace('_', ' ').lower()} for {company_ticker_av}..."):
-            get_company_financials(company_ticker_av, statement_type=statement_type_selected)
+            company_df = get_company_financials(company_ticker_av, statement_type=statement_type_selected)
+            if company_df is not None:
+                # --- Capture for AI Summary ---
+                st.session_state['ai_summary_data']['Company Financials'] = {
+                    "ticker": company_ticker_av,
+                    "statement_type": statement_type_selected,
+                    "financial_data_head": company_df.head().to_markdown() # Send top rows as markdown
+                }
+            else:
+                st.session_state['ai_summary_data']['Company Financials'] = {
+                    "ticker": company_ticker_av,
+                    "statement_type": statement_type_selected,
+                    "financial_data_head": "No data found."
+                }
     else:
         st.warning("Please enter a company stock ticker.")
 
+# --- MOVED: AI Summary Section (Now before Ask the AI) ---
+st.markdown("---")
+st.header("🧠 AI Summary")
+st.write("Click the button below to get an AI-generated summary and commentary on the outputs from the features you've used above.")
 
+if st.button("Generate AI Summary", key="generate_ai_summary_btn"):
+    if not st.session_state['ai_summary_data']:
+        st.info("No data has been generated by the features yet. Please use the features above first.")
+    else:
+        try:
+            genai.configure(api_key=st.secrets["gemini"]["api_key"])
+        except KeyError:
+            st.error("Gemini API key not found in Streamlit secrets. Please set it as `gemini.api_key` in .streamlit/secrets.toml or Streamlit Cloud secrets.")
+            st.stop()
+
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        summary_prompt_parts = []
+        summary_prompt_parts.append("You are an expert Indian financial advisor providing a summary and commentary. Below are outputs generated from various financial tools. Please consolidate this information, identify key insights, and provide actionable commentary. If a feature was not used, ignore it. Focus on the most relevant financial implications.\n\n")
+
+        for feature_name, data in st.session_state['ai_summary_data'].items():
+            summary_prompt_parts.append(f"--- {feature_name} Output ---")
+            if feature_name == "Investment Plan":
+                summary_prompt_parts.append(f"User Inputs: {data['user_inputs']}")
+                summary_prompt_parts.append(f"AI Advice: {data['advice']}")
+                summary_prompt_parts.append(f"Allocation: {data['allocation']}")
+            elif feature_name == "Mutual Fund Research":
+                summary_prompt_parts.append(f"Search Query: {data['query']}")
+                summary_prompt_parts.append(f"Results: {data['results']}")
+            elif feature_name == "Document Analysis":
+                summary_prompt_parts.append(f"Document Question: {data['document_question']}")
+                summary_prompt_parts.append(f"AI's Analysis: {data['ai_response']}")
+            elif feature_name == "FRED Data":
+                summary_prompt_parts.append(f"FRED Series ID: {data['series_id']}")
+                summary_prompt_parts.append(f"Data Summary:\n{data['data_summary']}")
+            elif feature_name == "Financial News":
+                summary_prompt_parts.append(f"Number of Articles: {data['number_of_articles']}")
+                summary_prompt_parts.append(f"Articles:\n{data['articles_summary']}")
+            elif feature_name == "Company Financials":
+                summary_prompt_parts.append(f"Company Ticker: {data['ticker']}")
+                summary_prompt_parts.append(f"Statement Type: {data['statement_type']}")
+                summary_prompt_parts.append(f"Financial Data (Head):\n{data['financial_data_head']}")
+            elif feature_name == "Direct AI Question":
+                summary_prompt_parts.append(f"User Question: {data['question']}")
+                summary_prompt_parts.append(f"AI Response: {data['ai_response']}")
+            summary_prompt_parts.append("\n") # Add a newline for separation
+
+        full_summary_prompt = "\n".join(summary_prompt_parts)
+
+        with st.spinner("Generating AI Summary..."):
+            try:
+                summary_response = model.generate_content(contents=[{"role": "user", "parts": [full_summary_prompt]}])
+                st.subheader("💡 AI's Consolidated Summary & Commentary:")
+                st.markdown(f"<p style='color: white;'>{summary_response.text}</p>", unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error calling Gemini AI for summary: {e}. This might be due to the prompt being too long or other API issues. Try using fewer features or shorter inputs.")
+
+# --- MOVED: Ask the AI Section (Now after AI Summary) ---
 st.markdown("---")
 st.header("💬 Ask the AI")
 user_question = st.text_area("Ask your financial question:", key="ai_question_area")
 
 if user_question:
-    # --- Option for Hugging Face Sentiment Analysis (if model loaded) ---
-    if sentiment_classifier:
-        with st.spinner("Analyzing sentiment with Hugging Face..."):
-            hf_sentiment_result = sentiment_classifier(user_question)[0]
-            st.info(f"Hugging Face Sentiment: **{hf_sentiment_result['label']}** (Confidence: {hf_sentiment_result['score']:.2f})")
-    else:
-        st.warning("Hugging Face sentiment model not loaded. Please check logs for errors or confirm dependencies.")
-    # --- END Hugging Face Sentiment ---
-
     try:
         genai.configure(api_key=st.secrets["gemini"]["api_key"])
     except KeyError:
@@ -412,9 +504,6 @@ if user_question:
 
     with st.spinner("Thinking..."):
         try:
-            # Original Gemini prompt for financial advice (you can remove the explicit sentiment instruction here
-            # if you prefer to rely solely on the Hugging Face model for sentiment display).
-            # If you want Gemini to *also* comment on sentiment, keep its instruction.
             prompt = (
                 f"You are a helpful and expert Indian financial advisor. "
                 f"Analyze the user's question and provide your financial advice based on the question.\n\n"
@@ -427,5 +516,10 @@ if user_question:
             )
             st.subheader("🤖 AI Says:")
             st.markdown(f"<p style='color: white;'>{response.text}</p>", unsafe_allow_html=True)
+            # --- Capture for AI Summary ---
+            st.session_state['ai_summary_data']['Direct AI Question'] = {
+                "question": user_question,
+                "ai_response": response.text
+            }
         except Exception as e:
             st.error(f"Error calling Gemini AI: {e}. Please check your API key and model usage.")
