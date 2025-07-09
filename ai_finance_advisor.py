@@ -9,9 +9,8 @@ import requests
 import google.generativeai as genai
 from pypdf import PdfReader
 from fredapi import Fred
-# --- NEW IMPORT FOR HUGGING FACE ---
-from transformers import pipeline
-# --- END NEW IMPORT ---
+
+
 
 from advisor import generate_recommendation, search_funds
 
