@@ -3,17 +3,18 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import re
-import base64
+import base64 # CORRECTED: Changed from base66 to base64
 import os
 import requests
 import google.generativeai as genai
 from pypdf import PdfReader
 from fredapi import Fred
 import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta # IMPORTANT: Ensure this is at the very top and NOT duplicated
 import numpy as np
 
 # Assuming 'advisor' module exists and contains these functions
+# Make sure you have advisor.py in the same directory or adjust import path
 from advisor import generate_recommendation, search_funds
 
 # IMPORTANT: st.set_page_config MUST be the first Streamlit command
@@ -30,7 +31,7 @@ def set_background(image_file):
     try:
         with open(image_file, "rb") as f:
             data = f.read()
-        encoded = base66.b64encode(data).decode()
+        encoded = base64.b64encode(data).decode() # CORRECTED: Used base64
         css = f"""
         <style>
         .stApp {{
@@ -81,7 +82,7 @@ def set_background(image_file):
         fallback_css = """<style>.stApp {background-color: #222222; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;}</style>"""
         st.markdown(fallback_css, unsafe_allow_html=True)
 
-set_background("black-particles-background.avif")
+set_background("black-particles-background.avif") # Ensure this file exists in your project directory
 
 # --- Initialize session state for AI summary inputs ---
 if 'ai_summary_data' not in st.session_state:
@@ -535,7 +536,7 @@ if st.button("Get Company Financials", key="get_company_financials_btn"):
                 st.session_state['ai_summary_data']['Company Financials'] = {
                     "ticker": company_ticker_av,
                     "statement_type": statement_type_selected,
-                    "financial_data_head": company_df.head().to_markdown()
+                    "financial_data_head": company_df.head().to_markdown() # Ensure tabulate is installed for this to work
                 }
             else:
                 st.session_state['ai_summary_data']['Company Financials'] = {
