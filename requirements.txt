@@ -9,3 +9,5 @@ pandas
 google-generativeai
 pypdf
 fredapi
+transformer
+torch
