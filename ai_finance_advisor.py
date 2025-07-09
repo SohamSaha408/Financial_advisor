@@ -360,13 +360,10 @@ if st.button("Get FRED Data", key="fetch_fred_data_btn"):
 
 
 # --- NEW: Market Trends Visualization Section ---
-# ... (rest of your code above this section) ...
-
-# --- NEW: Market Trends Visualization Section ---
 st.markdown("---")
 st.header("📈 Market Trends Visualization (Candlestick)")
 st.write("Visualize historical price trends for Nifty 50 or other stock/index symbols.")
-st.info("Hint: For **Nifty 50**, use ticker `^NSEI`. For **Reliance Industries**, use `RELIANCE.NS`. For **Apple**, use `AAPL`.") # Added AAPL as a common example
+st.info("Hint: For **Nifty 50**, use ticker `^NSEI`. For **Reliance Industries**, use `RELIANCE.NS`. For **Apple**, use `AAPL`.")
 
 market_ticker = st.text_input(
     "Enter Stock/Index Ticker Symbol (e.g., ^NSEI, RELIANCE.NS):",
@@ -375,7 +372,8 @@ market_ticker = st.text_input(
 ).strip().upper()
 
 # Set default start date to 1 year ago and end date to today
-from datetime import datetime, timedelta
+# These datetime imports should be at the top of your file, but included here for context
+# from datetime import datetime, timedelta
 end_date = datetime.now().date()
 start_date = end_date - timedelta(days=365) # One year ago
 
@@ -389,7 +387,7 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
     if market_ticker:
         with st.spinner(f"Fetching historical data for {market_ticker}..."):
             try:
-                # Ensure dates are in correct format for yfinance (it handles datetime.date objects fine)
+                # Fetch data using yfinance
                 data = yf.download(market_ticker, start=chart_start_date, end=chart_end_date)
 
                 # --- DEBUGGING STEP: Display the raw data ---
@@ -411,18 +409,37 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
                         open=data['Open'],
                         high=data['High'],
                         low=data['Low'],
-                        close=data['Close']
+                        close=data['Close'],
+                        # Ensure candlestick colors are distinct and visible
+                        increasing_line_color='green',  # Green for increasing
+                        decreasing_line_color='red',    # Red for decreasing
+                        increasing_fillcolor='rgba(0,255,0,0.6)', # Slightly transparent green fill
+                        decreasing_fillcolor='rgba(255,0,0,0.6)'  # Slightly transparent red fill
                     )])
                     fig.update_layout(
                         title=f"{market_ticker} Price Trend ({chart_start_date} to {chart_end_date})",
                         xaxis_title="Date",
-                        yaxis_title="Price",
+                        yaxis_title="Price", # Using yaxis_title, as it's common in go.Figure
                         xaxis_rangeslider_visible=False, # Hide the range slider for cleaner look
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        font_color='white',
-                        xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.2)'),
-                        yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.2)')
+                        paper_bgcolor='rgba(0,0,0,0)', # Transparent background for the entire chart area
+                        plot_bgcolor='rgba(0,0,0,0)', # Transparent background for the plotting area
+                        font_color='white', # Default font color for general text
+                        title_font_color='white', # Title font color
+                        legend_font_color='white', # Legend font color if applicable
+                        xaxis=dict(
+                            showgrid=True,
+                            gridcolor='rgba(255,255,255,0.2)', # Lighter grid lines
+                            tickfont=dict(color='white'),    # X-axis tick labels
+                            title_font_color='white',         # X-axis title
+                            linecolor='white'                 # X-axis line
+                        ),
+                        yaxis=dict(
+                            showgrid=True,
+                            gridcolor='rgba(255,255,255,0.2)', # Lighter grid lines
+                            tickfont=dict(color='white'),    # Y-axis tick labels
+                            title_font_color='white',         # Y-axis title
+                            linecolor='white'                 # Y-axis line
+                        )
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
@@ -442,7 +459,7 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
                             f"End Close: {last_close:.2f}, "
                             f"Max High: {max_high:.2f}, "
                             f"Min Low: {min_low:.2f}"
-                        ) if isinstance(first_open, (int, float)) and isinstance(last_close, (int, float)) else "Data summary not available due to missing values or non-numeric data."
+                        ) if isinstance(first_open, (int, float)) and isinstance(last_close, (int, float)) and isinstance(max_high, (int, float)) and isinstance(min_low, (int, float)) else "Data summary not available due to missing values or non-numeric data."
                     }
 
             except Exception as e:
@@ -454,10 +471,8 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
                 }
     else:
         st.warning("Please enter a ticker symbol to fetch market trends.")
-# --- END NEW SECTION ---
+# --- END Market Trends Visualization Section ---
 
-# ... (rest of your code below this section) ...
-# --- END NEW SECTION ---
 
 
 # --- Latest Financial News Section ---
