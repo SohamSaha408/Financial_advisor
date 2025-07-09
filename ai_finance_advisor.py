@@ -17,22 +17,34 @@ from advisor import generate_recommendation, search_funds
 # IMPORTANT: st.set_page_config MUST be the first Streamlit command
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
 
-# --- JavaScript for Scrolling (MODIFIED HERE) ---
+# --- JavaScript for Scrolling (CRITICAL UPDATE HERE - Polling Mechanism) ---
 # This script defines a function to scroll to an HTML element by its ID.
-# It's injected once at the start and can be called by Streamlit buttons.
+# It uses a polling mechanism to ensure the element is in the DOM before attempting to scroll.
 st.markdown("""
 <script>
     function scrollToElement(id) {
-        var element = document.getElementById(id);
-        if (element) {
-            // Increased delay to 500ms to give Streamlit more time to render
-            setTimeout(() => {
+        let attempts = 0;
+        const maxAttempts = 50; // Try for up to 50 times (50 * 50ms = 2.5 seconds)
+        const intervalTime = 50; // Check every 50 milliseconds
+
+        const checkAndScroll = setInterval(() => {
+            var element = document.getElementById(id);
+
+            if (element) {
+                clearInterval(checkAndScroll); // Stop polling once found
+                console.log("Found element with ID: " + id + " after " + (attempts + 1) + " attempts. Attempting to scroll.");
                 element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 500);
-        } else {
-            // Log a warning to the browser console if the element is not found
-            console.warn("Scroll target element with ID '" + id + "' not found.");
-        }
+            } else {
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    clearInterval(checkAndScroll); // Stop polling after max attempts
+                    console.error("Failed to find element with ID '" + id + "' after " + maxAttempts + " attempts. Scrolling aborted.");
+                } else {
+                    // You can uncomment the line below for more verbose debugging in the console
+                    // console.warn("Attempt " + (attempts) + ": Scroll target element with ID '" + id + "' NOT FOUND yet. Retrying...");
+                }
+            }
+        }, intervalTime);
     }
 </script>
 """, unsafe_allow_html=True)
@@ -69,14 +81,16 @@ def set_background(image_file):
             color: #E0E0E0 !important; text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
         }}
         .stButton>button {{
-            background-color: #4CAF50; color: white; border-radius: 0.5rem; border: none;
+            background-color: #34495e; /* Dark blue-gray for harmony */
+            color: white; border-radius: 0.5rem; border: none;
             padding: 0.75rem 1.5rem; font-size: 1rem; cursor: pointer; transition: background-color 0.3s;
         }}
         .stButton>button:hover {{
-            background-color: #45a049;
+            background-color: #44607a; /* Slightly lighter blue-gray on hover */
         }}
         .stTextInput, .stNumberInput, .stSelectbox, .stTextArea {{
-            background-color: rgba(255, 255, 255, 0.1); border-radius: 0.5rem; padding: 0.5rem;
+            background-color: rgba(0, 0, 0, 0.4); /* Darker semi-transparent for inputs */
+            border-radius: 0.5rem; padding: 0.5rem;
             border: 1px solid rgba(255, 255, 255, 0.3);
         }}
         .stTextInput > div > div > input, .stNumberInput > div > div > input, .stTextArea > div > div > textarea {{
@@ -92,7 +106,7 @@ def set_background(image_file):
         """
         st.markdown(css, unsafe_allow_html=True)
     except FileNotFoundError:
-        st.error(f"Error loading background image '{image_file}'. Please check the file path and name.")
+        st.error(f"Error loading background image '{image_file}'. Please ensure the image is in the correct directory.")
         fallback_css = """<style>.stApp {background-color: #222222; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;}</style>"""
         st.markdown(fallback_css, unsafe_allow_html=True)
     except Exception as e:
@@ -508,7 +522,7 @@ if st.button("Refresh News", key="refresh_news_btn"):
             }
         else:
             st.info("Could not fetch financial news at this moment. Please try again later.")
-            st.session_session_state['ai_summary_data']['Financial News'] = {
+            st.session_state['ai_summary_data']['Financial News'] = {
                 "number_of_articles": 0,
                 "articles_summary": "No news articles fetched."
             }
