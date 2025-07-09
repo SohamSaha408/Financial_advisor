@@ -360,6 +360,9 @@ if st.button("Get FRED Data", key="fetch_fred_data_btn"):
 
 
 # --- NEW: Market Trends Visualization Section ---
+# ... (rest of your code above this section) ...
+
+# --- NEW: Market Trends Visualization Section ---
 st.markdown("---")
 st.header("📈 Market Trends Visualization (Candlestick)")
 st.write("Visualize historical price trends for Nifty 50 or other stock/index symbols.")
@@ -412,14 +415,22 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
                     st.plotly_chart(fig, use_container_width=True)
 
                     # --- Capture for AI Summary ---
+                    # Safely get the first/last values for summary
+                    first_open = data['Open'].iloc[0] if not data['Open'].empty else 'N/A'
+                    last_close = data['Close'].iloc[-1] if not data['Close'].empty else 'N/A'
+                    max_high = data['High'].max() if not data['High'].empty else 'N/A'
+                    min_low = data['Low'].min() if not data['Low'].empty else 'N/A'
+
                     st.session_state['ai_summary_data']['Market Trend Visualization'] = {
                         "ticker": market_ticker,
                         "date_range": f"{chart_start_date} to {chart_end_date}",
-                        "data_summary": f"Fetched {len(data)} data points. "
-                                        f"Open: {data['Open'].iloc[0]:.2f}, "
-                                        f"Close: {data['Close'].iloc[-1]:.2f}, "
-                                        f"High: {data['High'].max():.2f}, "
-                                        f"Low: {data['Low'].min():.2f}"
+                        "data_summary": (
+                            f"Fetched {len(data)} data points. "
+                            f"Start Open: {first_open:.2f}, "
+                            f"End Close: {last_close:.2f}, "
+                            f"Max High: {max_high:.2f}, "
+                            f"Min Low: {min_low:.2f}"
+                        ) if isinstance(first_open, (int, float)) and isinstance(last_close, (int, float)) else "Data summary not available due to missing values."
                     }
 
                 else:
@@ -431,14 +442,19 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
                     }
 
             except Exception as e:
+                # Catching specific yfinance errors might be better, but a general catch for now.
+                # Common yfinance errors include invalid ticker or no data for the period.
                 st.error(f"Error fetching market data for {market_ticker}: {e}. Ensure the ticker is correct and try again.")
                 st.session_state['ai_summary_data']['Market Trend Visualization'] = {
                     "ticker": market_ticker,
                     "date_range": f"{chart_start_date} to {chart_end_date}",
-                    "data_summary": f"Error: {e}"
+                    "data_summary": f"Error during fetch: {e}"
                 }
     else:
         st.warning("Please enter a ticker symbol to fetch market trends.")
+# --- END NEW SECTION ---
+
+# ... (rest of your code below this section) ...
 # --- END NEW SECTION ---
 
 
