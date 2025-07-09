@@ -10,4 +10,4 @@ google-generativeai
 pypdf
 fredapi
 transformer
-torch
+tensorflow
