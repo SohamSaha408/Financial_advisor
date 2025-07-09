@@ -143,7 +143,7 @@ def get_financial_news(query="finance OR economy OR stock market OR investing", 
 
 # --- Streamlit App Layout ---
 
-st.title("💸 AI Financial Advisor")
+st.title(" AI Financial Advisor")
 st.header("📊 Get Your Investment Plan")
 
 age = st.number_input("Age", min_value=18, key="age_input")
@@ -156,7 +156,7 @@ goal = st.selectbox("🎯 Investment Goal", [
 
 if st.button("Get Advice", key="get_advice_btn"):
     result = generate_recommendation(age, income, profession, region, goal)
-    st.subheader("🧠 Advice")
+    st.subheader(" Advice")
     st.markdown(f"<p style='color: white;'>{result['advice_text']}</p>", unsafe_allow_html=True)
 
     st.subheader("📊 Allocation Chart")
