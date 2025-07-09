@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import re
-import base64 # CORRECTED: Changed from base66 to base64
+import base64
 import os
 import requests
 import google.generativeai as genai
@@ -11,10 +11,9 @@ from pypdf import PdfReader
 from fredapi import Fred
 import yfinance as yf
 from datetime import datetime, timedelta # IMPORTANT: Ensure this is at the very top and NOT duplicated
-import numpy as np
+import numpy as np # IMPORTANT: Ensure this is at the very top (if you use it for a temporary plot or other numpy operations)
 
 # Assuming 'advisor' module exists and contains these functions
-# Make sure you have advisor.py in the same directory or adjust import path
 from advisor import generate_recommendation, search_funds
 
 # IMPORTANT: st.set_page_config MUST be the first Streamlit command
@@ -31,7 +30,7 @@ def set_background(image_file):
     try:
         with open(image_file, "rb") as f:
             data = f.read()
-        encoded = base64.b64encode(data).decode() # CORRECTED: Used base64
+        encoded = base64.b64encode(data).decode()
         css = f"""
         <style>
         .stApp {{
@@ -363,10 +362,10 @@ if st.button("Get FRED Data", key="fetch_fred_data_btn"):
         st.warning("Please enter a FRED Series ID to fetch data.")
 
 
-# --- Market Trends Visualization Section (MODIFIED FOR LINE CHART) ---
+# --- Market Trends Visualization Section ---
 st.markdown("---")
-st.header("📈 Market Trends Visualization (Line Chart)") # Changed header for clarity
-st.write("Visualize historical closing price trends for Nifty 50 or other stock/index symbols.")
+st.header("📈 Market Trends Visualization (Candlestick)")
+st.write("Visualize historical price trends for Nifty 50 or other stock/index symbols.")
 st.info("Hint: For **Nifty 50**, use ticker `^NSEI`. For **Reliance Industries**, use `RELIANCE.NS`. For **Apple**, use `AAPL`.")
 
 market_ticker = st.text_input(
@@ -405,47 +404,55 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
                     st.dataframe(data.head()) # Show the first few rows of data to verify
                     st.write("-----------------------------")
 
-                    st.subheader(f"Closing Price Line Chart for {market_ticker}")
-                    fig = go.Figure(data=[go.Scatter(
+                    st.subheader(f"Candlestick Chart for {market_ticker}")
+                    fig = go.Figure(data=[go.Candlestick(
                         x=data.index,
-                        y=data['Close'], # Plotting 'Close' price
-                        mode='lines',      # Display as a line chart
-                        name='Closing Price',
-                        line=dict(color='white', width=2) # White line for visibility
+                        open=data['Open'],
+                        high=data['High'],
+                        low=data['Low'],
+                        close=data['Close'],
+                        # Ensure candlestick colors are distinct and visible
+                        increasing_line_color='green',  # Green for increasing
+                        decreasing_line_color='red',    # Red for decreasing
+                        increasing_fillcolor='rgba(0,255,0,0.6)', # Slightly transparent green fill
+                        decreasing_fillcolor='rgba(255,0,0,0.6)'  # Slightly transparent red fill
                     )])
                     fig.update_layout(
-                        title=f"{market_ticker} Closing Price Trend ({chart_start_date} to {chart_end_date})",
+                        title=f"{market_ticker} Price Trend ({chart_start_date} to {chart_end_date})",
                         xaxis_title="Date",
-                        yaxis_title="Closing Price",
-                        xaxis_rangeslider_visible=False,
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        font_color='white',
-                        title_font_color='white',
-                        legend_font_color='white',
+                        yaxis_title="Price", # Using yaxis_title, as it's common in go.Figure
+                        xaxis_rangeslider_visible=False, # Hide the range slider for cleaner look
+                        paper_bgcolor='rgba(0,0,0,0)', # Transparent background for the entire chart area
+                        plot_bgcolor='rgba(0,0,0,0)', # Transparent background for the plotting area
+                        font_color='white', # Default font color for general text
+                        title_font_color='white', # Title font color
+                        legend_font_color='white', # Legend font color if applicable
                         xaxis=dict(
                             showgrid=True,
-                            gridcolor='rgba(255,255,255,0.2)',
-                            tickfont=dict(color='white'),
-                            title_font_color='white',
-                            linecolor='white'
+                            gridcolor='rgba(255,255,255,0.2)', # Lighter grid lines
+                            tickfont=dict(color='white'),    # X-axis tick labels
+                            title_font_color='white',         # X-axis title
+                            linecolor='white'                 # X-axis line
                         ),
                         yaxis=dict(
                             showgrid=True,
-                            gridcolor='rgba(255,255,255,0.2)',
-                            tickfont=dict(color='white'),
-                            title_font_color='white',
-                            linecolor='white'
+                            gridcolor='rgba(255,255,255,0.2)', # Lighter grid lines
+                            tickfont=dict(color='white'),    # Y-axis tick labels
+                            title_font_color='white',         # Y-axis title
+                            linecolor='white'                 # Y-axis line
                         )
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
                     # --- Capture for AI Summary ---
+                    # Safely get the first/last values for summary
+                    # Ensure these are actual numbers before formatting for the summary string
                     first_open = data['Open'].iloc[0] if not data['Open'].empty else None
                     last_close = data['Close'].iloc[-1] if not data['Close'].empty else None
                     max_high = data['High'].max() if not data['High'].empty else None
                     min_low = data['Low'].min() if not data['Low'].empty else None
 
+                    # Construct the data_summary string carefully
                     summary_parts = [f"Fetched {len(data)} data points."]
                     if first_open is not None:
                         summary_parts.append(f"Start Open: {first_open:.2f}")
@@ -459,7 +466,7 @@ if st.button("Get Market Trend Chart", key="get_market_trend_btn"):
                     st.session_state['ai_summary_data']['Market Trend Visualization'] = {
                         "ticker": market_ticker,
                         "date_range": f"{chart_start_date} to {chart_end_date}",
-                        "data_summary": ", ".join(summary_parts)
+                        "data_summary": ", ".join(summary_parts) # Join parts with a comma and space
                     }
 
             except Exception as e:
@@ -536,7 +543,8 @@ if st.button("Get Company Financials", key="get_company_financials_btn"):
                 st.session_state['ai_summary_data']['Company Financials'] = {
                     "ticker": company_ticker_av,
                     "statement_type": statement_type_selected,
-                    "financial_data_head": company_df.head().to_markdown() # Ensure tabulate is installed for this to work
+                    # Ensure tabulate is installed for .to_markdown() to work
+                    "financial_data_head": company_df.head().to_markdown() # Send top rows as markdown
                 }
             else:
                 st.session_state['ai_summary_data']['Company Financials'] = {
@@ -582,7 +590,7 @@ if st.button("Generate AI Summary", key="generate_ai_summary_btn"):
             elif feature_name == "FRED Data":
                 summary_prompt_parts.append(f"FRED Series ID: {data['series_id']}")
                 summary_prompt_parts.append(f"Data Summary:\n{data['data_summary']}")
-            elif feature_name == "Market Trend Visualization":
+            elif feature_name == "Market Trend Visualization": # NEW CASE
                 summary_prompt_parts.append(f"Ticker: {data['ticker']}")
                 summary_prompt_parts.append(f"Date Range: {data['date_range']}")
                 summary_prompt_parts.append(f"Summary: {data['data_summary']}")
@@ -596,7 +604,7 @@ if st.button("Generate AI Summary", key="generate_ai_summary_btn"):
             elif feature_name == "Direct AI Question":
                 summary_prompt_parts.append(f"User Question: {data['question']}")
                 summary_prompt_parts.append(f"AI Response: {data['ai_response']}")
-            summary_prompt_parts.append("\n")
+            summary_prompt_parts.append("\n") # Add a newline for separation
 
         full_summary_prompt = "\n".join(summary_prompt_parts)
 
