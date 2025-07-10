@@ -19,14 +19,14 @@ from advisor import generate_recommendation, search_funds
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
 
 # --- JavaScript for Scrolling (Full Polling Mechanism and 'nearest' block) ---
-# This script defines a function to scroll to an HTML element by its ID.
-# It uses a polling mechanism to ensure the element is in the DOM before attempting to scroll.
-st.markdown("""
+# Use st.empty() to ensure the JavaScript is injected into a stable, early-rendered part of the DOM.
+js_placeholder = st.empty()
+js_placeholder.markdown("""
 <script>
     function scrollToElement(id) {
         let attempts = 0;
-        const maxAttempts = 100; // Increased attempts for more robustness (up to 5 seconds)
-        const intervalTime = 50; // Check every 50 milliseconds
+        const maxAttempts = 300; // Increased to 30 seconds total wait (300 * 100ms)
+        const intervalTime = 100; // Check every 100 milliseconds
 
         const checkAndScroll = setInterval(() => {
             var element = document.getElementById(id);
@@ -34,7 +34,6 @@ st.markdown("""
             if (element) {
                 clearInterval(checkAndScroll); // Stop polling once found
                 console.log("Found element with ID: " + id + " after " + (attempts + 1) + " attempts. Attempting to scroll.");
-                // Changed 'block: start' to 'block: nearest' for potentially better behavior
                 element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } else {
                 attempts++;
@@ -43,7 +42,6 @@ st.markdown("""
                     console.error("Failed to find element with ID '" + id + "' after " + maxAttempts + " attempts. Scrolling aborted.");
                 } else {
                     // console.warn("Attempt " + (attempts) + ": Scroll target element with ID '" + id + "' NOT FOUND yet. Retrying...");
-                    // Uncomment the above line for verbose debugging if needed in console
                 }
             }
         }, intervalTime);
