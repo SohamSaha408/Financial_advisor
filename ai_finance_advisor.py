@@ -12,19 +12,20 @@ from datetime import datetime, timedelta
 import numpy as np
 
 # Assuming 'advisor' module exists and contains these functions
+# Make sure 'advisor.py' is in the same directory as this app.py
 from advisor import generate_recommendation, search_funds
 
 # IMPORTANT: st.set_page_config MUST be the first Streamlit command
 st.set_page_config(page_title="AI Financial Advisor", layout="centered")
 
-# --- JavaScript for Scrolling (CRITICAL UPDATE HERE - Polling Mechanism) ---
+# --- JavaScript for Scrolling (Full Polling Mechanism and 'nearest' block) ---
 # This script defines a function to scroll to an HTML element by its ID.
 # It uses a polling mechanism to ensure the element is in the DOM before attempting to scroll.
 st.markdown("""
 <script>
     function scrollToElement(id) {
         let attempts = 0;
-        const maxAttempts = 50; // Try for up to 50 times (50 * 50ms = 2.5 seconds)
+        const maxAttempts = 100; // Increased attempts for more robustness (up to 5 seconds)
         const intervalTime = 50; // Check every 50 milliseconds
 
         const checkAndScroll = setInterval(() => {
@@ -33,15 +34,16 @@ st.markdown("""
             if (element) {
                 clearInterval(checkAndScroll); // Stop polling once found
                 console.log("Found element with ID: " + id + " after " + (attempts + 1) + " attempts. Attempting to scroll.");
-                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Changed 'block: start' to 'block: nearest' for potentially better behavior
+                element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } else {
                 attempts++;
                 if (attempts >= maxAttempts) {
                     clearInterval(checkAndScroll); // Stop polling after max attempts
                     console.error("Failed to find element with ID '" + id + "' after " + maxAttempts + " attempts. Scrolling aborted.");
                 } else {
-                    // You can uncomment the line below for more verbose debugging in the console
                     // console.warn("Attempt " + (attempts) + ": Scroll target element with ID '" + id + "' NOT FOUND yet. Retrying...");
+                    // Uncomment the above line for verbose debugging if needed in console
                 }
             }
         }, intervalTime);
@@ -50,7 +52,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# --- 1. Background and Initial CSS ---
+# --- 1. Background and Initial CSS (Full Code) ---
 def set_background(image_file):
     if not os.path.exists(image_file):
         st.error(f"Background image not found: '{image_file}'. Please ensure the image is in the correct directory.")
@@ -106,7 +108,7 @@ def set_background(image_file):
         """
         st.markdown(css, unsafe_allow_html=True)
     except FileNotFoundError:
-        st.error(f"Error loading background image '{image_file}'. Please ensure the image is in the correct directory.")
+        st.error(f"Background image not found: '{image_file}'. Please ensure the image is in the correct directory.")
         fallback_css = """<style>.stApp {background-color: #222222; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;}</style>"""
         st.markdown(fallback_css, unsafe_allow_html=True)
     except Exception as e:
