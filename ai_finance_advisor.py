@@ -224,4 +224,84 @@ def get_company_financials(symbol, statement_type="INCOME_STATEMENT"):
                 df[col] = pd.to_numeric(df[col], errors='coerce')
 
             desired_order = ['fiscalDateEnding', 'reportedCurrency', 'totalRevenue', 'netIncome', 'earningsPerShare', 'totalShareholderEquity']
-            ordered_
+            ordered_cols = [col for col in desired_order if col in df.columns] + \
+                           [col for col in df.columns if col not in desired_order]
+            df = df[ordered_cols]
+
+            st.dataframe(df.set_index('fiscalDateEnding'))
+            return df
+        elif "Note" in data:
+            st.warning(f"Alpha Vantage API note for {symbol}: {data['Note']}. This often indicates a rate limit, an invalid symbol, or no data for the requested function.")
+        else:
+            st.warning(f"No {statement_type.replace('_', ' ').lower()} data found for {symbol}. Check the symbol or API key.")
+        return None
+    except KeyError:
+        st.error("Alpha Vantage API key not found in Streamlit secrets. Please add `alphavantage.api_key` to .streamlit/secrets.toml or Streamlit Cloud secrets.")
+        return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching financial statements for {symbol}: {e}. Check API key or internet connection.")
+        return None
+    except Exception as e:
+        st.error(f"An unexpected error occurred while fetching financial statements: {e}")
+        return None
+
+
+st.title("💸 AI Financial Advisor")
+
+
+# --- Investment Plan Section ---
+st.markdown("<div id='investment_plan'></div>", unsafe_allow_html=True) # Anchor for scrolling
+st.header("📊 Get Your Investment Plan")
+
+age = st.number_input("Age", min_value=18, key="age_input")
+income = st.number_input("Monthly Income (₹)", step=1000, key="income_input")
+profession = st.selectbox("Profession", ["Student", "Salaried", "Self-employed"], key="prof_select")
+region = st.selectbox("Region", ["Metro", "Urban", "Rural"], key="region_select")
+goal = st.selectbox("🎯 Investment Goal", [
+    "Wealth Accumulation", "Retirement Planning", "Short-term Savings", "Tax Saving (ELSS)"
+], key="goal_select")
+
+if st.button("Get Advice", key="get_advice_btn"):
+    result = generate_recommendation(age, income, profession, region, goal)
+    st.subheader("🧠 Advice")
+    st.markdown(f"<p style='color: white;'>{result['advice_text']}</p>", unsafe_allow_html=True)
+
+    st.subheader("📊 Allocation Data")
+    alloc = result["allocation"]
+    eq = extract_amount(alloc["Equity"])
+    de = extract_amount(alloc["Debt"])
+    go = extract_amount(alloc["Gold"])
+
+    # Display allocation as text/dataframe instead of chart
+    st.write(f"Equity: ₹{eq:,}")
+    st.write(f"Debt: ₹{de:,}")
+    st.write(f"Gold: ₹{go:,}")
+
+    # --- Capture for AI Summary ---
+    st.session_state['ai_summary_data']['Investment Plan'] = {
+        "user_inputs": f"Age: {age}, Income: {income}, Profession: {profession}, Region: {region}, Goal: {goal}",
+        "advice": result['advice_text'],
+        "allocation": f"Equity: {eq}, Debt: {de}, Gold: {go}"
+    }
+
+st.markdown("---")
+
+
+# --- Mutual Fund Research Section ---
+st.markdown("<div id='mutual_fund_research'></div>", unsafe_allow_html=True) # Anchor for scrolling
+st.header("🔍 Mutual Fund Research")
+search_query = st.text_input("Enter fund name to search", key="fund_search_input")
+if search_query:
+    funds = search_funds(search_query)
+    found_funds_info = []
+    if funds:
+        for fund in funds[:5]:
+            st.markdown(f"<p style='color: white;'><b>{fund['schemeName']}</b></p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='color: white;'>Scheme Code: {fund.get('schemeCode', 'N/A')}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='color: white;'>[Live NAV](https://api.mfapi.in/mf/{fund.get('schemeCode', '')})</p>", unsafe_allow_html=True)
+            found_funds_info.append(f"{fund['schemeName']} (Code: {fund.get('schemeCode', 'N/A')})")
+        # --- Capture for AI Summary ---
+        st.session_state['ai_summary_data']['Mutual Fund Research'] = {
+            "query": search_query,
+            "results": f"Found {len(funds)} funds. Top 5: {', '.join(found_funds_info)}"
+        }
