@@ -11,6 +11,18 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import numpy as np
 
+
+# Your JavaScript block at the top, immediately after st.set_page_config
+js_placeholder = st.empty()
+js_placeholder.markdown("""
+<script>
+    // Explicitly attach to window object to ensure global scope
+    window.scrollToElement = function(id) {
+        // ... (rest of your scrollToElement function code) ...
+    }; // <-- Ensure this semicolon is here
+</script>
+""", unsafe_allow_html=True)
+
 # Assuming 'advisor' module exists and contains these functions
 # Make sure 'advisor.py' is in the same directory as this app.py
 from advisor import generate_recommendation, search_funds
